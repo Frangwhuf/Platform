@@ -1,0 +1,7 @@
+// This is the top-level directory.  It contains configure.in and other
+// stuff
+
+#define DIR_TYPE toplevel
+#define EXTRA_DIST Config.bld
+
+

@@ -1,0 +1,104 @@
+// tool/Config.bld
+//
+// This file defines certain configuration variables that are written
+// into the various make scripts.  It is processed by oconfig (along
+// with the Soruces.bld files in each of the various directories) to
+// generate bulid scripts appropriate to each environment.
+//
+// oconfig is capable of generating makefiles for Unix compilers such
+// as gcc or SGI's MipsPRO compiler, as well as for Windows environments
+// like Microsoft's Visual C++.  It can also generate Microsoft
+// Developer's Studio solution and project files directly.  In principle,
+// it can be extended to generate suitable build script files for any
+// number of different build environments.
+//
+// All of these build scripts can be tuned for a particular
+// environment via this file.  This is the place for the user to
+// specify which external packages are installed and where, or to
+// enable or disable certan optional features.  However, it is
+// suggested that rather then modify this file directly, you create
+// a custom file in your home directory and there redefine whatever
+// variables are appropriate, and set the environment variable
+// OCONFIG_CONFIG to refer to it.  In this way, you can easilly get
+// an updated source tree (including a new Config.bld) without
+// risking accidentally losing your customizations.  This also avoids
+// having to redefine the same variables in different packages (for
+// instance in tool and in olive).
+//
+// The syntax in this file resembles some hybrid between C++
+// preprocessor declarations and GNU make variables.  This is the
+// syntax used in the various oconfig system configuration files; it
+// is designed to be easy to use as a macro language to generate
+// makefiles and their ilk.
+//
+// Some of the variables below are defined using the #define command,
+// and others are defined using #defer.  The two are very similar in
+// their purpose; the difference is that, if the variable definition
+// includes references to other variables (e.g. $[varname]), then
+// #define will evaluate all of the other variable references
+// immediately and store the resulting expansion, while #defer will
+// store only the variable references themselves, and expand them when
+// the variable is later referenced.  It is very similar to the
+// relationship between := and = in GNU Make.
+//
+// In general, #defer is used in this file, to allow the user to
+// redefine critical variables in his or her own Config.bld file.
+
+// What kind of build scripts are we generating?  This selects a
+// suitable template file from the oconfig system files.  The
+// allowable choices, at present, are:
+//
+// unix     - Generate makefiles suitable for most Unix platforms.
+// msvc     - Generate Visual C++ solution and project files.
+// gmsvc    - Generate makefiles similar to the above, using Mircosoft
+//            Visual C++, bus uses the Cygwin-supplied GNU make
+//            instead of Microsoft nmake.  This is potentially
+//            faster if you have multiple CPU's, since it supports
+//            distributed make.  It's a tiny bit slower if you're
+//            not taking advantage of distributed make, because of
+//            the overhead associated with Cygwin fork() calls.
+
+#if $[eq $[PLATFORM], Win32]
+  // allow folks to have msvc8 defined
+  #if $[eq $[BUILD_TYPE],]
+    #print defining msvc $[BUILD_TYPE]
+    #define BUILD_TYPE msvc
+  #else
+    #print defaulting to build type $[BUILD_TYPE]
+  #endif
+#elif $[eq $[PLATFORM], Cygwin]
+  #define BUILD_TYPE gmsvc
+#elif $[eq $[PLATFORM], osx]
+  #define BUILD_TYPE osx
+#else
+  #define BUILD_TYPE unix
+#endif
+
+// What is the normal extension of a compiled object file?
+#if $[WINDOWS_PLATFORM]
+  #define OBJ .obj
+  #define EXE .exe
+  #define SCRIPT_EXT .bat
+#else
+  #define OBJ .o
+  #define EXE
+  #define SCRIPT_EXT .sh
+#endif
+
+// What platforms we know about
+#define KNOWN_PLATFORMS Win32 Linux osx
+
+// What we consider compilable sources
+#defer COMPILABLE_TYPES %.cpp %.cxx %.h %.hpp %.c %.I %.rc
+
+// What we consider to be perl files
+#defer PERL_TYPES %.pl %.pm
+
+//////////////////////////////////////////////////////////////////////
+// There are also some additional variables that control specific
+// compiler/platform features or characteristics, defined in the
+// platform specific file Config.platform.bld.  Be sure to inspect
+// these variables for correctness too.
+//////////////////////////////////////////////////////////////////////
+
+#include $[BUILD_SCRIPTS]/Defaults.bld

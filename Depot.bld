@@ -1,0 +1,73 @@
+//
+// Depot.bld
+//
+// This file defines certain configuration variables that are to be
+// written into the various make scripts.  It is processed by oconfig
+// (along with the Sources.bld files in each of the various directories)
+// to generate build scripts appropriate to each environment.
+//
+// This is the depot-specific file, which should be at the top of
+// every source hierarchy.  It generally gets the ball rolling, and
+// is responsible for explicitly including all of the relevent Config.bld
+// files.
+
+// Check the version of oconfig in use
+#if $[< $[OCONFIG_VERSION], 1.0]
+  #error You need at lease oconfig version 1.0 to process this depot.
+#endif
+
+// What is the name and version of this source tree?
+#if $[eq $[DEPOT],]
+  #define DEPOT projects
+  #define VERSION 1.0 
+#endif
+
+// Record where we can be found.
+#define PROJECTS $[if $[eq $[THISDIRPREFIX],],$[TOPDIR],$[THISDIRPREFIX]]
+
+// These variables tell oconfig how to interpret the contents of the
+// PLATFORM variable, and help it to control the effect of functions
+// like $[os] and $[isfullpath].
+
+// True if we are building on some flavor of Windows.
+#define WINDOWS_PLATFORM $[or $[eq $[PLATFORM],Win32],$[eq $[PLATFORM],Cygwin]]
+
+// True if we are building on some flavor of OS X.
+#define OSX_PLATFORM $[or $[eq $[PLATFORM],Darwin],$[eq $[PLATFORM],osx]]
+
+// True if we are building on some flavor of Unix. (basically if we
+// aren't any of the above)
+#define UNIX_PLATFORM $[and $[not $[WINDOWS_PLATFORM]],$[not $[OSX_PLATFORM]]]
+
+// We really need to know how to find the bulid scripts.  We will look to
+// BUILD_SCRIPTS for this
+#if $[eq $[BUILD_SCRIPTS],]
+  #error "You must define BUILD_SCRIPTS and point it to a local copy of your build scripts."
+#endif
+
+// Pull in the depot-level Config file.  This contains a lot of
+// configuration variables that the user might want to fine-tune.
+#include $[THISDIRPREFIX]Config.bld
+
+// Also get the platform-specific config file.  This defines a few
+// more variables that are more likely to be platform-dependant and
+// are less likely to be directly modified by the user.
+#define PLATFORM_CONFIG $[BUILD_SCRIPTS]/Config.$[PLATFORM].bld
+#include $[PLATFORM_CONFIG]
+
+// If the environment variable OCONFIG_CONFIG is set, it points to a
+// user-customized Config.bld file, for instance in the user's home
+// directory.  This file might redefine any of the variables defined
+// above.
+#if $[ne $[OCONFIG_CONFIG],]
+  #set OCONFIG_CONFIG $[unixfilename $[OCONFIG_CONFIG]]
+  #print Reading $[osfilename $[OCONFIG_CONFIG]]
+  #include $[OCONFIG_CONFIG]
+#else
+  #print Environment variable OCONFIG_CONFIG not set; using defaults.
+#endif
+
+#define IMPORT_DEPOT DevTools
+
+// Finally, include the system configure file.
+#include $[BUILD_SCRIPTS]/System.bld
