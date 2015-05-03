@@ -5,10 +5,3 @@
     #define LOCAL_LIBS tools
   #end test_bin_target
 #end file
-
-//#forscopes test_bin_target
-//  #if $[eq $[TARGET],test]
-//    #define TARGET tools_test
-//  #endif
-//#end test_bin_target
-
