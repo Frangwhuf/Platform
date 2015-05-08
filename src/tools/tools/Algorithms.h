@@ -3,16 +3,21 @@
 #include <tools/MetaBase.h>
 #include <tools/Tools.h>
 
-#ifdef WINDOWS_PLATFORM
-#  pragma warning( disable : 4548 )
-#endif // WINDOWS_PLATFORM
-#include <boost/cast.hpp>
-#ifdef WINDOWS_PLATFORM
-#  pragma warning( default : 4548 )
-#endif // WINDOWS_PLATFORM
-
 #include <functional>
-#include <smmintrin.h>
+#ifdef WINDOWS_PLATFORM
+#  include <intrin.h>
+#  include <nmmintrin.h>
+#elif defined(UNIx_PLATFORM)
+#  if (defined(__x86_64__) || defined(__i386__))
+// GCC compatible, x86/x86-64
+#    include <x86intrin.h>
+// TODO: this may now be depricated in favor of <immintrin.h>, look into this
+#  else
+#    error "What the hell are you? No idea where get intrinsics"
+#  endif // GCC variants
+#else
+#  error "Don't know how to load intrinsics for this compiler/arch"
+#endif // WINDOWS_PLATFORM
 
 namespace tools {
     template< typename IntT >

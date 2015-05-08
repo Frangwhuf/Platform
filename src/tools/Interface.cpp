@@ -16,7 +16,7 @@
 #  pragma warning( disable : 4571 )
 #  pragma warning( disable : 4619 )
 #endif // WINDOWS_PLATFORM
-#include <boost/cast.hpp>
+#include <boost/numeric/conversion/cast.hpp>
 #include <boost/format.hpp>
 #ifdef WINDOWS_PLATFORM
 #  pragma warning( default : 4365 )

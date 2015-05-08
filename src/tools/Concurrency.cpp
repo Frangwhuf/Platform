@@ -2471,12 +2471,13 @@ TaskSchedImpl::threadEntry( void )
 			continue;
 		}
 		// Ok, maybe the root has something?
-		if( Task * t = queue->pushMany( externalQueue_->popQueue( TaskLocalQueue::spawnsPreCacheTarget / 4U ), *idleCvar_ ) ) {
+        Task * t = nullptr;
+		if( t = queue->pushMany( externalQueue_->popQueue( TaskLocalQueue::spawnsPreCacheTarget / 4U ), *idleCvar_ ) ) {
 			TOOLS_ASSERT( !t->nextTask_ );
             reportQtime( t, annotation, &measure );
             runAndReport( t, annotation, detector.get(), measure.lastTask() );
 			continue;
-		} else if( Task * t = orderedSpawns_->pop() ) {
+		} else if( t = orderedSpawns_->pop() ) {
 			// Ordered spawns next because the ordered queue may the
 			// ordered queue is likely to be expansionary
 			TOOLS_ASSERT( !t->nextTask_ );
@@ -2487,7 +2488,7 @@ TaskSchedImpl::threadEntry( void )
 			TOOLS_ASSERT( queue->ordered_ );
 			queue->ordered_ = false;
 			continue;
-		} else if( Task * t = ordered_->pop() ) {
+		} else if( t = ordered_->pop() ) {
 			// Lowest priority, this may create more unordered work.
 			TOOLS_ASSERT( !t->nextTask_ );
 			TOOLS_ASSERT( !queue->ordered_ );

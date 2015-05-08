@@ -9,11 +9,9 @@
 
 #include "Win32Tools.h"
 
-#include <boost/cast.hpp>
 #include <algorithm>
 
 using namespace tools;
-using boost::numeric_cast;
 
 #define MS_VC_EXCEPTION 0x406D1388
 #pragma warning ( disable : 4200 )

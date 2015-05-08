@@ -7,7 +7,7 @@
 #include <tools/String.h>
 #include <tools/Tools.h>
 
-#include <boost/cast.hpp>
+#include <boost/numeric/conversion/cast.hpp>
 
 #include <stdlib.h>
 #include <wctype.h>

@@ -6,7 +6,7 @@
 
 #include <algorithm>
 #include <vector>
-#include <boost/cast.hpp>
+#include <boost/numeric/conversion/cast.hpp>
 
 using namespace tools;
 using boost::numeric_cast;

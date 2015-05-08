@@ -14,7 +14,7 @@
 #  pragma warning( default : 4987 )
 #endif // WINDOWS_PLATFORM
 
-#include <boost/cast.hpp>
+#include <boost/numeric/conversion/cast.hpp>
 
 #pragma comment(lib, "dbghelp")
 

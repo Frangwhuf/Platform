@@ -8,14 +8,9 @@
 #  include <intrin.h>
 #  pragma intrinsic(_InterlockedCompareExchangePointer)
 #  pragma intrinsic(_InterlockedExchangeAdd64)
-#  pragma warning( disable : 4371 )
-#  pragma warning( disable : 4548 )
 #endif // WINDOWS_PLATFORM
-#include <boost/cast.hpp>
-#ifdef WINDOWS_PLATFORM
-#  pragma warning( default : 4371 )
-#  pragma warning( default : 4548 )
-#endif // WINDOWS_PLATFORM
+
+#include <boost/utility.hpp>
 
 namespace tools {
     namespace impl {
@@ -2462,6 +2457,7 @@ TOOLS_WARNINGS_RESTORE
     template< typename ImplementationT, typename ReferenceT >
     struct StandardStaticReferenced
         : ReferenceT::Reference
+        , boost::noncopyable
     {
         StandardStaticReferenced( void )
             : refs_( 1 )
@@ -2485,10 +2481,6 @@ TOOLS_WARNINGS_RESTORE
         }
     protected:
         unsigned mutable volatile refs_;
-    private:
-        // Cannot be copied or assigned.
-        StandardStaticReferenced( StandardStaticReferenced const & ) {}
-        StandardStaticReferenced & operator=( StandardStaticReferenced const & ) { return *this; }
     };
 
     // A mutual exclusion lock of otherwise unspecified type

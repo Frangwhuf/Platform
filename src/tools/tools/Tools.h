@@ -43,6 +43,8 @@
 #ifdef WINDOWS_PLATFORM
 #  ifdef _M_IX86
 #    define TOOLS_ARCH_X86
+#  elif defined(_M_X64)
+#    define TOOLS_ARCH_X86
 #  else // _M_IX86
 #    define TOOLS_ARCH_UNKNOWN
 #  endif // _M_IX86

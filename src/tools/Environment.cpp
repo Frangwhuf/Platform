@@ -8,11 +8,9 @@
 #include <unordered_map>
 #include <vector>
 
-#include <boost/cast.hpp>
 #include <boost/mpl/list.hpp>
 
 using namespace tools;
-using boost::numeric_cast;
 
 namespace {
     struct CycleTest

@@ -10,7 +10,7 @@
 #ifdef WINDOWS_PLATFORM
 #  pragma warning( disable : 4371 )
 #endif // WINDOWS_PLATFORM
-#include <boost/cast.hpp>
+#include <boost/numeric/conversion/cast.hpp>
 #ifdef WINDOWS_PLATFORM
 #  pragma warning( default : 4371 )
 #endif // WINDOWS_PLATFORM
