@@ -138,7 +138,7 @@ namespace {
         clear( void )
         {
             TOOLS_ASSERT( tools::isPow2( TableSize ));
-            std::fill_n( buckets_, TableSize, static_cast< ElementT * >( NULL ));
+            std::fill_n( buckets_, TableSize, static_cast< ElementT * >( nullptr ));
         }
         // Lookup an element by its key
         template< typename KeyT >
@@ -192,9 +192,9 @@ namespace {
                     tail = &j->next_;
                 }
                 // Reset the bucket pointers
-                buckets_[ i ] = NULL;
+                buckets_[ i ] = nullptr;
             }
-            *tail = NULL;
+            *tail = nullptr;
             return head;
         }
         // Return a flat, linked array based on a condition
@@ -219,9 +219,9 @@ namespace {
                     }
                 }
                 // Reset the bucket pointers
-                *bucketTail = NULL;
+                *bucketTail = nullptr;
             }
-            *tail = NULL;
+            *tail = nullptr;
             return head;
         }
 
@@ -556,7 +556,7 @@ namespace {
                 prefix->trace_->inc();
                 getTotalTrackedMemory() += prefix->trace_->size() * trackingInterval_;
             } else {
-                prefix->trace_ = NULL;
+                prefix->trace_ = nullptr;
             }
             return body;
         }
@@ -937,7 +937,7 @@ namespace {
     {
         // Current number of allocations, so we can tell if the block is free.
         unsigned refs_;
-        // The next free node within this slab.  If this is null the slab is entirely occupied.
+        // The next free node within this slab.  If this is nullptr the slab is entirely occupied.
         void * freeMap_;
     };
 
@@ -1039,7 +1039,7 @@ namespace {
         // change state to 'StateFree' and unmap; otherwise, change state to 'StateLowFrag'. Currently
         // just called from the NodeSmallPool destructor.
         void detach( NodeSmallPool *, unsigned );
-        // Try and reuse this slab if there are free nodes available for reuse. If this returns non-NULL
+        // Try and reuse this slab if there are free nodes available for reuse. If this returns non-nullptr
         // the slab is configured for reuse otherwise it is configured for return to the master pool when
         // it is sufficiently fragmented.
         FreeNode * reuse( unsigned, unsigned );
@@ -1326,14 +1326,14 @@ namespace {
             void * place;
             place = alignPlace( size + sizeof( AllocHeadT ), phase + sizeof( AllocHeadT ), align, slabUsed_, slabMax_ );
             if( TOOLS_UNLIKELY( !place )) {
-                return NULL;
+                return nullptr;
             }
             AllocHeadT * aHead = static_cast< AllocHeadT * >( place );
             TOOLS_ASSERT( reinterpret_cast< uint8 * >( aHead ) >= slabUsed_ );
             // The placement function may leave gaps between the allocations, take that into account.
             slabUsed_ = reinterpret_cast< uint8 * >( place ) + ( size + sizeof( AllocHeadT ));
             TOOLS_ASSERT( slabUsed_ <= slabMax_ );
-            TOOLS_ASSERT( slabHead_ != NULL );
+            TOOLS_ASSERT( slabHead_ != nullptr );
             // Construction via placement new
             ( void )::new( static_cast< void * >( aHead )) AllocHeadT( slabHead_, sample, parentTrace_ );
             linkAllocationIn( aHead );
@@ -1623,8 +1623,8 @@ alignSpecOf(
     }
 }
 
-// Measure an area for aligned placement potential.  This may return NULL if the
-// allocation cannot fit.  If this returns non-NULL, the return value is the beginning
+// Measure an area for aligned placement potential.  This may return nullptr if the
+// allocation cannot fit.  If this returns non-nullptr, the return value is the beginning
 // of the user data area and the new end value is AlignSpec.placementBytes_ afteer.
 // The pointers are not dereferenced.
 static inline void *
@@ -1651,7 +1651,7 @@ alignPlace(
     }
     size_t sizeEnd = ( userBeginAlignSize + userSize );
     if( sizeEnd > reinterpret_cast< size_t >( freeEnd )) {
-        return NULL;
+        return nullptr;
     }
     // Every thing is all nice and aligned now
     return reinterpret_cast< void * >( userBeginAlignSize - phase );
@@ -1709,7 +1709,7 @@ unalignAlloc(
 //        if( !prefix ) {
 //            impl::resourceTraceDump( impl::resourceTraceDumpPhaseTerminal );
 //            // TODO: log out of memory message
-//            return NULL;
+//            return nullptr;
 //        }
 //        body = reinterpret_cast< uint8 * >( prefix ) + 1;
 //        HeapSuffix * suffix = reinterpret_cast< HeapSuffix * >( body + size );
@@ -1721,7 +1721,7 @@ unalignAlloc(
 //        if( !prefix ) {
 //            impl::resourceTraceDump( impl::resourceTraceDumpPhaseTerminal );
 //            // TODO: log out of memory message
-//            return NULL;
+//            return nullptr;
 //        }
 //        body = reinterpret_cast< uint8 * >( prefix ) + 1;
 //    }
@@ -2008,7 +2008,7 @@ namespace tools
                 fprintf( stdout, "outOfMemoryDie() called with multiple recursion, cannot dump memory stats\n" );
             }
             if( prevNesting < 2 ) {
-                impl::resourceTraceDump( impl::resourceTraceDumpPhaseAll, false, NULL );
+                impl::resourceTraceDump( impl::resourceTraceDumpPhaseAll, false, nullptr );
             }
             TOOLS_ASSERT( !"outOfMemoryDie() called" );
             abort();
@@ -2139,11 +2139,11 @@ namespace tools
     Affinity *
     staticServiceCacheInit( Affinity ***, Inherent *** )
     {
-        static AffinityInherentMaster affinity( impl::affinityInstance< PlatformUntracked >(), NULL, TOOLS_RESOURCE_SAMPLE_NAMED( 0, "inherent" ), 0, false );
+        static AffinityInherentMaster affinity( impl::affinityInstance< PlatformUntracked >(), nullptr, TOOLS_RESOURCE_SAMPLE_NAMED( 0, "inherent" ), 0, false );
         //if( impl::memoryTrack() ) {
         //    static TermDump term;
         //    static Affinity * result;
-        //    static AutoDispose<> affinityDisp( affinityVerifyNew( impl::memTrackIntervalInherent(), &result, &affinity, NULL, TOOLS_RESOURCE_SAMPLE_PARENT(affinity.sample_), NULL, true ));
+        //    static AutoDispose<> affinityDisp( affinityVerifyNew( impl::memTrackIntervalInherent(), &result, &affinity, nullptr, TOOLS_RESOURCE_SAMPLE_PARENT(affinity.sample_), nullptr, true ));
         //    return result;
         //} else {
             return &affinity;
@@ -2168,7 +2168,7 @@ namespace tools
         static TemporalAffinity affinity( true, impl::affinityInstance< Inherent >(), impl::resourceTraceBuild( "temporal" ), impl::leakProtect() );
         //if( impl::memoryTrack() ) {
         //    static Affinity * result;
-        //    static AutoDispose<> affinityDisp( affinityVerifyNew( impl::memTrackIntervalTemporal(), &result, &affinity, NULL, affinity.trace_, NULL ));
+        //    static AutoDispose<> affinityDisp( affinityVerifyNew( impl::memTrackIntervalTemporal(), &result, &affinity, nullptr, affinity.trace_, nullptr ));
         //    return result;
         //} else {
             return &affinity;
@@ -2227,7 +2227,7 @@ affinityTemporalThreadLocalNew(
     bool leakProtect = impl::leakProtect();
     auto ret = new ThreadLocalTemporalAffinityFork( parent, impl::resourceTraceBuild( sample ), leakProtect );
     if( impl::memoryTrack() ) {
-        return affinityVerifyNew( impl::memoryTrackingIntervalTemporal(), affinity, ret, ret, impl::resourceTraceBuild( sample ), NULL );
+        return affinityVerifyNew( impl::memoryTrackingIntervalTemporal(), affinity, ret, ret, impl::resourceTraceBuild( sample ), nullptr );
     } else {
         *affinity = ret;
         return ret;
@@ -2347,14 +2347,14 @@ tokenFaultPool(
     while( true ) {
         Pool * existing = atomicRead( &srcPool.slabPools_[ unitLevel ] );
         if( !!existing ) {
-            // Once it becomes non-NULL, that is stable
+            // Once it becomes non-nullptr, that is stable
             return existing;
         }
         // Create a new pool. A PoolVerify wrapper (for memory tracking) on top of unitDescs[unitLevel].src
         // which is a NodeSmallPool with a fairly large allocation size (see poolUnits[]).
         size_t poolNbytes = unitDescs[ unitLevel ].src_->describe().size_;
         // Don't really need to embed the size in poolName since resource lines always show the size.
-        impl::ResourceTrace  * trace = NULL;
+        impl::ResourceTrace  * trace = nullptr;
         if( impl::memoryTrack() ) {
             boost::format fmt( "%s cyclic slab" );
             fmt % name.c_str();
@@ -2367,7 +2367,7 @@ tokenFaultPool(
         Pool * result;
         AutoDispose<> lifetime;
         result = tmpPool.release( &lifetime );
-        if( atomicCas< Pool *, Pool * >( &srcPool.slabPools_[ unitLevel ], NULL, result ) != NULL ) {
+        if( atomicCas< Pool *, Pool * >( &srcPool.slabPools_[ unitLevel ], nullptr, result ) != nullptr ) {
             continue;  // drops lifetime
         }
         // Just successfully installed a pointer to the pool from unitDescs[ unitLevel ], which we don't
@@ -2415,11 +2415,11 @@ namespace tools {
                     // Still growing and this is not detached, however we need the scale marker for when
                     // it is later freed.
                     current->next_ = current->slabReturns_;
-                    current->slabReturns_ = NULL;
-                    current->singleton_ = NULL;
+                    current->slabReturns_ = nullptr;
+                    current->singleton_ = nullptr;
                 } else {
-                    // Set this initially to NULL before we refill
-                    current->next_ = NULL;
+                    // Set this initially to nullptr before we refill
+                    current->next_ = nullptr;
                     if( CyclicSlab * emptiest = current->slabReturns_ ) {
                         // We're going to recycle the slabs in the return list and discard the completely
                         // empty slabs. Then bubble the most empty to the front of the list.
@@ -2449,7 +2449,7 @@ namespace tools {
                     }
                     // No recycles pending, allocate a new slab
                     CyclicSlab * newSlab = static_cast< CyclicSlab * >( desc.slabPools_[ slabPoolsSaturated ]->map() );
-                    newSlab->next_ = NULL;
+                    newSlab->next_ = nullptr;
                     current->next_ = newSlab;
                     return cyclicSlabFormatAndAlloc( newSlab, unitDescs[ slabPoolsSaturated ].srcBytes_, desc );
                 }
@@ -2464,7 +2464,7 @@ namespace tools {
             CyclicSlabRoot * newSlab = static_cast< CyclicSlabRoot * >( slabPool->map() );
             newSlab->next_ = newSlab;
             newSlab->singleton_ = singletonAlloc;
-            newSlab->slabReturns_ = ( iSlabAlloc < slabPoolsSaturated ) ? unitDescs[ iSlabAlloc ].term_ : NULL;
+            newSlab->slabReturns_ = ( iSlabAlloc < slabPoolsSaturated ) ? unitDescs[ iSlabAlloc ].term_ : nullptr;
             *referenceSlabList = newSlab;
             return cyclicSlabFormatAndAlloc( newSlab, unitDescs[ iSlabAlloc ].srcBytes_ - ( sizeof( CyclicSlabRoot ) - sizeof( CyclicSlab )), desc );
         }
@@ -2548,7 +2548,7 @@ BinaryPoolMaster::BinaryPoolMaster(
 {
     Pool::Desc innerDesc = inner.describe();
     TOOLS_ASSERT( ( innerDesc.align_ == innerDesc.size_ ) && ( innerDesc.phase_ == 0 ));
-    std::fill( blocks_, blocks_ + tableSize, static_cast< BinaryBlock * >( NULL ));
+    std::fill( blocks_, blocks_ + tableSize, static_cast< BinaryBlock * >( nullptr ));
     desc_.align_ = desc_.size_ = innerDesc.size_ / 2U;
     desc_.phase_ = 0;
     impl::ResourceSample s = sample;
@@ -2607,7 +2607,7 @@ BinaryPoolMaster::unmap(
 {
     TOOLS_ASSERT( ( reinterpret_cast< size_t >( site ) % desc_.size_ ) == 0 );
     BinaryBlock * block = static_cast< BinaryBlock * >( site );
-    block->next_ = NULL;
+    block->next_ = nullptr;
     block->base_ = reinterpret_cast< void * >( tools::roundDownPow2( reinterpret_cast< uintptr_t >( block ), desc_.size_ ));
     insertUnique( pointerBucket( block->base_ ), block );
 }
@@ -2623,7 +2623,7 @@ BinaryPoolMaster::extract(
         if( !blocks_[ idx ] ) {
             continue;
         }
-        BinaryBlock * block = atomicExchange< BinaryBlock *, BinaryBlock * >( blocks_ + idx, NULL );
+        BinaryBlock * block = atomicExchange< BinaryBlock *, BinaryBlock * >( blocks_ + idx, nullptr );
         if( !block ) {
             continue;
         }
@@ -2631,7 +2631,7 @@ BinaryPoolMaster::extract(
         return block;
     }
     // None were found
-    return NULL;
+    return nullptr;
 }
 
 void
@@ -2640,9 +2640,9 @@ BinaryPoolMaster::insertUnique(
     BinaryBlock * next )
 {
     // TODO: get rid of fasle sharing on blocks_ (add padding to make each element at least a cache line)
-    while( !!atomicCas< BinaryBlock *, BinaryBlock * >( blocks_ + bucket, NULL, next )) {
+    while( !!atomicCas< BinaryBlock *, BinaryBlock * >( blocks_ + bucket, nullptr, next )) {
         // There are existing items in the list; perform a merge against the items in the next bucket.
-        BinaryBlock * existing = atomicExchange< BinaryBlock *, BinaryBlock * >( blocks_ + bucket, NULL );
+        BinaryBlock * existing = atomicExchange< BinaryBlock *, BinaryBlock * >( blocks_ + bucket, nullptr );
         if( !existing ) {
             continue;
         }
@@ -2672,7 +2672,7 @@ BinaryPoolMaster::insertUnique(
         *j = existing;
         // We should be at the end of j and at the end of k
         if( !next ) {
-            TOOLS_ASSERT( *j == NULL );
+            TOOLS_ASSERT( *j == nullptr );
             // We freed the last block in this bucket, abort.
             return;
         }
@@ -2696,7 +2696,7 @@ BinaryPoolMaster::innerMap(
     BinaryBlock * top = static_cast< BinaryBlock * >( inner->map() );
     BinaryBlock * bottom = reinterpret_cast< BinaryBlock * >( reinterpret_cast< uint8 * >( top ) + size );
     bottom->base_ = top;
-    bottom->next_ = NULL;
+    bottom->next_ = nullptr;
     *bottomHalf = bottom;
     return top;
 }
@@ -2708,7 +2708,7 @@ BinaryPoolMaster::innerMap(
 ProxyPool::ProxyPool(
     Pool & inner,
     size_t rephase )
-    : next_( NULL )
+    : next_( nullptr )
     , desc_( inner.describe() )
     , inner_( &inner )
 {
@@ -2792,10 +2792,10 @@ AffinityInherentBase::PoolInstance::PoolInstance(
     , pool_( r.pool_ )
     , poolDispose_( std::move( r.poolDispose_ ))
 {
-    r.next_ = NULL;
+    r.next_ = nullptr;
     r.size_ = 0U;
     r.phase_ = 0U;
-    r.pool_ = NULL;
+    r.pool_ = nullptr;
 }
 
 AffinityInherentBase::PoolInstance &
@@ -2807,10 +2807,10 @@ AffinityInherentBase::PoolInstance::operator=(
     phase_ = r.phase_;
     pool_ = r.pool_;
     poolDispose_ = std::move( r.poolDispose_ );
-    r.next_ = NULL;
+    r.next_ = nullptr;
     r.size_ = 0U;
     r.phase_ = 0U;
-    r.pool_ = NULL;
+    r.pool_ = nullptr;
     return *this;
 }
 
@@ -2908,7 +2908,7 @@ AffinityInherentBase::map(
 {
     AlignSpec spec;
     alignSpecOf( &spec, size + sizeof( Unmapper * ), phase + sizeof( Unmapper * ));
-    void * site = NULL;
+    void * site = nullptr;
     Unmapper * umap;
     if( spec.scale_ == alignScaleLine ) {
         // Redispatch to the inner allocator (small allocation
@@ -3023,9 +3023,9 @@ AffinityInherentBase::clearInstances(
         delete i;
     }
     std::sort( preDelete.begin(), preDelete.end() );
-    std::for_each( preDelete.begin(), preDelete.end(), []( PoolInstance & inst )->void {
-        AutoDispose<> toDisp( std::move( inst.poolDispose_ ));
-    });
+    for( auto && del : preDelete ) {
+        AutoDispose<> toDisp( std::move( del.poolDispose_ ));
+    }
 }
 
 uint32
@@ -3092,7 +3092,7 @@ AffinityInherentThreadLocal::AffinityInherentThreadLocal(
     , root_( bind ? &master.root_->bind() : &master )
     , master_( &master )
 {
-    std::fill( uniquePools_, uniquePools_ + binaryMasterSizeMax, static_cast< Pool * >( NULL ));
+    std::fill( uniquePools_, uniquePools_ + binaryMasterSizeMax, static_cast< Pool * >( nullptr ));
 }
 
 AffinityInherentThreadLocal::~AffinityInherentThreadLocal( void )
@@ -3109,7 +3109,7 @@ AffinityInherentThreadLocal::newPool(
         if( spec.size_ == ( 2U * 1024U * 1024U )) {
             // Never keep a per-thread buffer of these
             *referencePool = &root_->pool( spec.size_ );
-            return NULL;
+            return nullptr;
         }
         // The binary pools should be non-competetive
         BinaryMasterSize idx = binaryMasterSizeFromSize( spec.size_ );
@@ -3259,7 +3259,7 @@ AffinityInherentMaster::binaryMasterOf(
     size_t size )
 {
     BinaryMasterSize idx = binaryMasterSizeFromSize( size );
-    BinaryPoolMaster * next = NULL;
+    BinaryPoolMaster * next = nullptr;
     BinaryPoolMaster * prev;
     do {
         prev = masters_[ idx ].get();
@@ -3481,7 +3481,7 @@ VerifyAffinityBound::VerifyAffinityBound(
     unsigned trackingInterval,
     Affinity & inner,
     impl::ResourceTrace * target )
-    : VerifyAffinityBase( trackingInterval, inner.bind(), target, NULL )
+    : VerifyAffinityBase( trackingInterval, inner.bind(), target, nullptr )
 {
 }
 
@@ -3528,10 +3528,10 @@ VmemPoolUniqueAddr::VmemPoolUniqueAddr(
     size_t phase,
     unsigned /*level*/ )
     : lock_( monitorStaticNew() )
-    , regionBegin_( NULL )
-    , regionEnd_( NULL )
-    , regionNext_( NULL )
-    , reserveNext_( NULL )
+    , regionBegin_( nullptr )
+    , regionEnd_( nullptr )
+    , regionNext_( nullptr )
+    , reserveNext_( nullptr )
 {
     alignSpecOf( &spec_, size, phase, false );
     desc_.size_ = size;
@@ -3626,7 +3626,7 @@ HeapHugeImpl::HeapHugeImpl( void )
 void *
 HeapHugeImpl::map( size_t size, impl::ResourceSample const & sample, size_t phase )
 {
-    impl::ResourceTrace * trace = NULL;
+    impl::ResourceTrace * trace = nullptr;
     if( impl::memoryTrack() ) {
         trace = impl::resourceTraceBuild( interval, sample, parentTrace_ );
         trace->inc();
@@ -3748,7 +3748,7 @@ AffinityInherentForkBound::newPool(
         // This is a maximum size pool, pass the request through.
         // TODO: rebuffer a few allocations locally
         *referencePool = &root_->pool( spec.alignAlloc_ );
-        return NULL;
+        return nullptr;
     }
     if( spec.scale_ == alignScaleUnique ) {
         // The largest scale uses a binary pool
@@ -3786,7 +3786,7 @@ BinaryPoolThreadBuffer::BinaryPoolThreadBuffer(
     : master_( master )
     , inner_( master->inner_ )
     , parentSize_( master->desc_.size_ )
-    , mapOf_( NULL )
+    , mapOf_( nullptr )
     , unmappedUsed_( 0 )
     , unmappedMax_( static_cast< unsigned >( ( 1024ULL * 1024ULL ) / master->desc_.size_ ))
 {
@@ -3821,7 +3821,7 @@ BinaryPoolThreadBuffer::map( void )
     if( !!mapOf_ ) {
         // Unconditionally return the mapOf_.  This should help clustering slightly.
         void * ret = mapOf_;
-        mapOf_ = NULL;
+        mapOf_ = nullptr;
         return ret;
     }
     TOOLS_ASSERT( unmappedUsed_ <= unmappedMax_ );
@@ -3876,7 +3876,7 @@ BinaryPoolThreadBuffer::unmap(
     BinaryBlock * base = reinterpret_cast< BinaryBlock * >( tools::roundDownPow2( reinterpret_cast< uintptr_t >( block ), parentSize_ * 2 ));
     if( base == mapOf_ ) {
         // Immediate round trip
-        mapOf_ = NULL;
+        mapOf_ = nullptr;
         inner_->unmap( base );
         return;
     }
@@ -3892,7 +3892,7 @@ BinaryPoolThreadBuffer::unmap(
     TOOLS_ASSERT( unmappedUsed_ <= unmappedMax_ );
     if( unmappedUsed_ != unmappedMax_ ) {
         // Buffer this for later remate
-        block->next_ = NULL;
+        block->next_ = nullptr;
         block->base_ = base;
         unmapped_[ unmappedUsed_++ ] = block;
         return;
@@ -4027,10 +4027,10 @@ BufferingPoolNil::unmap(
 //    size_t phase,
 //    unsigned )
 //    : lock_( impl::monitorPlatformNew() )
-//    , regionBegin_( NULL )
-//    , regionEnd_( NULL )
-//    , regionNext_( NULL )
-//    , reserveNext_( NULL )
+//    , regionBegin_( nullptr )
+//    , regionEnd_( nullptr )
+//    , regionNext_( nullptr )
+//    , reserveNext_( nullptr )
 //{
 //    // We're setup to cycle this region
 //    alignSpecOf( &spec_, size, phase, false );
@@ -4039,7 +4039,7 @@ BufferingPoolNil::unmap(
 //    desc_.align_ = spec_.alignBytes_;
 //    impl::ResourceSample samp = sample;
 //    samp.size_ = sizeVmemPage;
-//    desc_.trace_ = impl::resourceTraceBuild( samp, NULL );
+//    desc_.trace_ = impl::resourceTraceBuild( samp, nullptr );
 //}
 //
 //VmemPool::~VmemPool( void )
@@ -4145,9 +4145,9 @@ NodePoolBase::NodePoolBase(
     size_t phase,
     size_t align )
     : super_( &super )
-    , newBlock_( NULL )
-    , newMapBegin_( NULL )
-    , newMapEnd_( NULL )
+    , newBlock_( nullptr )
+    , newMapBegin_( nullptr )
+    , newMapEnd_( nullptr )
 {
     Pool::Desc superDesc = super.describe();
     TOOLS_ASSERT( isPow2( superDesc.size_ ));
@@ -4206,7 +4206,7 @@ SuperBlock *
 NodePoolBase::firstFree( void )
 {
     if( freeBlocks_.empty() ) {
-        return NULL;
+        return nullptr;
     }
     return &freeBlocks_.back();
 }
@@ -4226,7 +4226,7 @@ NodePoolBase::acceptSuperBlock(
     TOOLS_ASSERT(!newBlock_);
     TOOLS_ASSERT(!newMapBegin_ && !newMapEnd_);
     newBlock_ = ::new( block ) SuperBlock;
-    newBlock_->freeMap_ = NULL;
+    newBlock_->freeMap_ = nullptr;
     newBlock_->refs_ = 1U;
     // 64 bytes are reserved for the superblock header.
     static_assert(sizeof(SuperBlock) <= 64, "SuperBlock header is too large");
@@ -4259,7 +4259,7 @@ NodePoolBase::tryMapUser( void )
     // yet. This is moving to the right, similar to a temporal slab. But unlike temporal, we can (and
     // already tried to) allocate on top of an item that has already been freed.
     if( !newBlock_ ) {
-        return NULL;
+        return nullptr;
     }
     // Otherwise, try and allocate from the new map range
     void * newFormat = alignPlace( spec_, newMapBegin_, newMapEnd_ );
@@ -4270,18 +4270,18 @@ NodePoolBase::tryMapUser( void )
     }
     // The superblock has filled to full. Further, we have no free items, or else we would have already
     // exited above. newBlock_->refs_ is maximal (roughly (superSize_ - slab header)/desc_.size_), but
-    // that isn't assertable due to alignPlace(..) padding. Though we can assert a null free map.
+    // that isn't assertable due to alignPlace(..) padding. Though we can assert a nullptr free map.
     TOOLS_ASSERT( newBlock_->refs_ > 1U );
-    TOOLS_ASSERT( newBlock_->freeMap_ == NULL );
+    TOOLS_ASSERT( newBlock_->freeMap_ == nullptr );
     // Remove the synthetic ref that we set in acceptSuperBlock(...) to clear our notion of this block
     // being not filled yet. Then fail. The caller should respond by making a new superblock.
     --newBlock_->refs_;
-    newBlock_ = NULL;
-    newMapBegin_ = newMapEnd_ = NULL;
+    newBlock_ = nullptr;
+    newMapBegin_ = newMapEnd_ = nullptr;
     // Although we weren't on the freeBlocks_ list if we got here, don't worry about this superblock
     // leaking. The next item freed (which there certainly should be given the high reference count)
     // will put it on the freeBlocks_ list.
-    return NULL;
+    return nullptr;
 }
 
 // Unmap user data and return a superblock pointer if it was entirely dereferenced. Locking is left to the
@@ -4312,7 +4312,7 @@ NodePoolBase::unmapUser(
         // First free in this super block, note it.
         freeBlocks_.push_front( *block );
     }
-    return NULL;
+    return nullptr;
 }
 
 ///////////
@@ -4336,7 +4336,7 @@ NodePool::map( void )
     if( !ret ) {
         void * superblock = super_->map();
         if( !superblock ) {
-            return NULL;
+            return nullptr;
         }
         acceptSuperBlock( superblock );
         ret = tryMapUser();
@@ -4378,7 +4378,7 @@ void *
 NodePoolSync::map( void )
 {
     void * ret;
-    void * super = NULL;
+    void * super = nullptr;
     {
         AutoDispose<> l_( lockFree_->enter() );
         ret = tryMapUser();
@@ -4389,7 +4389,7 @@ NodePoolSync::map( void )
     // Try to get an available superblock
     super = super_->map();
     if( !super ) {
-        return NULL;
+        return nullptr;
     }
     // Since we dropped the lock for a while, there is a (small) chance that another thread has freed
     // something in that time. It doesn't hurt to be optimistic and retry.
@@ -4515,10 +4515,10 @@ SlabHeadSmall::reuse( unsigned threadRefs, unsigned reuseThreadRefs )
         return prev;
     });
     if( !shouldReuse ) {
-        return NULL;
+        return nullptr;
     }
     TOOLS_ASSERT( !!frees_ );
-    return tools::atomicExchange< FreeNode *, FreeNode * >( &frees_, NULL );
+    return tools::atomicExchange< FreeNode *, FreeNode * >( &frees_, nullptr );
 }
 
 void
@@ -4561,11 +4561,11 @@ NodeSmallLocal::NodeSmallLocal(
     : parent_( parent )
     , spec_( parent->spec_ )
     , slabSize_( parent->slabSize_ )
-    , currentSlab_( NULL )
-    , currentFrees_( NULL )
+    , currentSlab_( nullptr )
+    , currentFrees_( nullptr )
     , currentRefs_( 0U )
-    , newMapBegin_( NULL )
-    , newMapEnd_( NULL )
+    , newMapBegin_( nullptr )
+    , newMapEnd_( nullptr )
     , newMapNodes_( 0U )
 {
     // The only reason this would get created is because we're going to map, so just do some allocation.
@@ -4601,18 +4601,18 @@ NodeSmallLocal::allocSlab( void )
         // fully populated free list covering the entire slab; the free list gets filled over time, on
         // an explicit free. When the free list is empty, we allocate from the range [newMapBegin_,
         // newMapEnd_), which represents the never allocated range in this slab.
-        currentSlab_->frees_ = NULL;
-        currentFrees_ = NULL;
+        currentSlab_->frees_ = nullptr;
+        currentFrees_ = nullptr;
         newMapBegin_ = currentSlab_ + 1U;
         newMapEnd_ = reinterpret_cast< uint8 * >( currentSlab_ ) + slabSize_;
         newMapNodes_ = 0U;
     } else {
         // This slab is not completely free. It has already been filled once, so in this iteration we
         // are not going to make use of newMapBegin_/newMapEnd_; everything we can use is on the free list.
-        newMapBegin_ = newMapEnd_ = NULL;
+        newMapBegin_ = newMapEnd_ = nullptr;
         // Take the entire free list from the slab and store it local to this type. That way we claim the
         // entire contents of the list for this thread.
-        currentFrees_ = atomicExchange< FreeNode *, FreeNode * >( &currentSlab_->frees_, NULL );
+        currentFrees_ = atomicExchange< FreeNode *, FreeNode * >( &currentSlab_->frees_, nullptr );
     }
     currentSlab_->attach( currentRefs_, isNew );
 }
@@ -4631,7 +4631,7 @@ NodeSmallLocal::tryMapCurrent( void )
     // Second, if this slab hasn't yet filled up, use that space. This is similar to filling a temporal
     // slab, just moving from low to high addresses.
     if( newMapBegin_ == newMapEnd_ ) {
-        return NULL;
+        return nullptr;
     }
     void * result = alignPlace( spec_, newMapBegin_, newMapEnd_ );
     if( !!result ) {
@@ -4662,7 +4662,7 @@ NodeSmallLocal::map( void )
         }
         unsigned targetRefs = maxRefs();
         // See if there are free nodes to recycle, or if the block is to be released back to the master.
-        // If newFreeNodes is NULL, the current was marked for release.
+        // If newFreeNodes is nullptr, the current was marked for release.
         if( FreeNode * newFreeNodes = currentSlab_->reuse( currentRefs_, targetRefs )) {
             currentFrees_ = newFreeNodes;
             currentRefs_ = targetRefs;
@@ -4698,7 +4698,7 @@ NodeSmallPoolBase::SuperUnmapQueue::SuperUnmapQueue(
     : slabPool_( &pool )
     , poolSize_( size )
     , leakProtectNote_( note )
-    , superUnmaps_( NULL )
+    , superUnmaps_( nullptr )
     , passSuperUnmap_( false )
 {
 }
@@ -4724,7 +4724,7 @@ NodeSmallPoolBase::SuperUnmapQueue::operator()(
         if( passSuperUnmap_ ) {
             slab->nextSlab_ = superUnmaps_;
             superUnmaps_ = slab;
-            return NULL;
+            return nullptr;
         } else {
             passSuperUnmap_ = true;
         }
@@ -4739,7 +4739,7 @@ NodeSmallPoolBase::SuperUnmapQueue::operator()(
 NodeSmallPoolBase::NodeSmallPoolBase(
     Pool & super )
     : slabPool_( &super )
-    , freeQueueSlabs_( NULL )
+    , freeQueueSlabs_( nullptr )
     , freeQueueLength_( 0U )
     , queueRefillLength_( 3U )
     , freeRefillLength_( 0U )
@@ -4755,13 +4755,13 @@ NodeSmallPoolBase::~NodeSmallPoolBase( void )
 {
     // Called after the thread local buffers are torn down, so everything in the lists should be fully
     // dereferenced.
-    std::for_each( freeSlabs_.begin(), freeSlabs_.end(), [&]( NodeSmallPoolBase::FreeSlab & slab )->void {
+    for( auto && slab : freeSlabs_ ) {
         // if slab.slab_->refs_->refs_ > 0, log a memory leak: Leak in a NodeSmallPoolBase freeSlabs_ slab
         // has reference count of (slab.slab_->refs_->refs_).  (A detailed leak message should follow.)
         if( atomicRead( &slab.slab_->refs_ ).refs_ == 0 ) {
             slabPool_->unmap( slab.slab_ );
         }
-    });
+    }
     TOOLS_ASSERT( refillSlabs_.empty() );
     while( SlabHeadSmall * i = freeQueueSlabs_ ) {
         freeQueueSlabs_ = freeQueueSlabs_->nextSlab_;
@@ -4812,7 +4812,7 @@ NodeSmallPoolBase::tryRefill( void )
     }
     // Preprocess the entries in the vector, update their reference counts and remove excess emptry entries.
     auto slabOut = refillSlabs_.begin();
-    std::for_each( refillSlabs_.begin(), refillSlabs_.end(), [&]( FreeSlab & item )->void {
+    for( auto && item : refillSlabs_ ) {
         if( uint32 const * refs = superUnmaps( item.slab_ )) {
             // update the sampled reference count
             slabOut->slabRefs_ = *refs;
@@ -4820,12 +4820,12 @@ NodeSmallPoolBase::tryRefill( void )
             ++slabOut;
         }
         // otherwise we don't keep it
-    });
+    }
     // Cut out anything we've already returned to the source because it was fully unmapped.
     refillSlabs_.erase( slabOut, refillSlabs_.end() );
     // Count everything we just removed
     size_t slabsPopped = 0U;
-    SlabHeadSmall * freeSlabsPushed = atomicExchange< SlabHeadSmall *, SlabHeadSmall * >( &freeQueueSlabs_, NULL );
+    SlabHeadSmall * freeSlabsPushed = atomicExchange< SlabHeadSmall *, SlabHeadSmall * >( &freeQueueSlabs_, nullptr );
     while( SlabHeadSmall * i = freeSlabsPushed ) {
         freeSlabsPushed = i->nextSlab_;
         ++slabsPopped;
@@ -4859,11 +4859,11 @@ NodeSmallPoolBase::tryRefill( void )
     }
     // Take the former contents of the free slabs and put them back on the pending list, but don't check
     // for refill metrics while we're working on it. We want this thread to return.
-    std::for_each( refillSlabs_.begin(), refillSlabs_.end(), [&]( FreeSlab & item )->void {
+    for( auto && item : refillSlabs_ ) {
         if( !!superUnmaps( item.slab_ )) {
             pushSlab( item.slab_, false );
         }
-    });
+    }
     refillSlabs_.clear();
     return true;
 }
@@ -4890,12 +4890,12 @@ NodeSmallPoolBase::popSlab( void )
     // Try to return an old slab that may be only partially freed and put it onto the free slabs list. The
     // slab's free list will tell you what can be allocated. Worth repeating: unlike all of our other
     // allocators, this one can return a slab that is partially used and still may have some allocated
-    // items on it. If we return NULL the caller will need to allocate a new slab.
+    // items on it. If we return nullptr the caller will need to allocate a new slab.
     
     // Only willing to return superUnmapsMax empty slabs during allocation.
     SlabHeadSmall * superUnmaps[ superUnmapsMax ];
     size_t superUnmapsUsed = 0U;
-    SlabHeadSmall * ret = NULL;
+    SlabHeadSmall * ret = nullptr;
     bool shouldRefill = false;
     {
         AutoDispose<> l_( freeSlabsLock_->enter() );
@@ -4998,7 +4998,7 @@ MemoryWrapPool::MemoryWrapPool(
     , length_( length )
     , allocSize_( size )
     , freeLock_( monitorNew() )
-    , freeList_( NULL )
+    , freeList_( nullptr )
 {
     TOOLS_ASSERT( length_ > 0 );
     alignSpecOf( &spec_, allocSize_, 0, false );
@@ -5006,7 +5006,7 @@ MemoryWrapPool::MemoryWrapPool(
     desc_.size_ = spec_.alignAlloc_;
     desc_.align_ = spec_.alignAlloc_;
     desc_.phase_ = 0U;
-    desc_.trace_ = NULL;
+    desc_.trace_ = nullptr;
     nextChunk_ = static_cast< uint8 * >( base_ );
 }
 
@@ -5031,7 +5031,7 @@ MemoryWrapPool::map( void )
         return static_cast< void * >( alloc );
     }
     // out of space
-    return NULL;
+    return nullptr;
 }
 
 void
@@ -5128,7 +5128,7 @@ MallocPool::MallocPool(
     desc_.phase_ = phase;
     impl::ResourceSample samp = sample;
     samp.size_ = desc_.size_;
-    desc_.trace_ = impl::resourceTraceBuild( sample, NULL );
+    desc_.trace_ = impl::resourceTraceBuild( sample, nullptr );
 }
 
 Pool::Desc const &
@@ -5164,7 +5164,7 @@ SlabHead::SlabHead(
     , checkLifetime_( checkLifetime )
     , source_( source )
     , genesis_( 0 )
-    , allocs_( NULL )
+    , allocs_( nullptr )
 {
     if( checkLifetime_ ) {
         genesis_ = impl::getHighResTime();
@@ -5181,7 +5181,7 @@ void
 SlabHead::setAllocsIfNull( AllocHeadCheckLifetime * head )
 {
     TOOLS_ASSERT( checkLifetime_ );
-    if( allocs_ == NULL ) {
+    if( allocs_ == nullptr ) {
         allocs_ = head;
     }
 }
@@ -5295,7 +5295,7 @@ AllocHeadCheckLifetime *
 AllocHeadCheckLifetime::getNext( void )
 {
     if( nextOffset_ == 0 ) {
-        return NULL;
+        return nullptr;
     }
     TOOLS_ASSERT( nextOffset_ <= parent_->getSlabSize() );
     uintptr_t ret = reinterpret_cast< uintptr_t >( parent_ ) + nextOffset_;
@@ -5323,9 +5323,9 @@ TemporalBase::TemporalBase(
     : runPool_( &pool )
     , runPoolDesc_( pool.describe() )
     , parentTrace_( trace )
-    , slabHead_( NULL )
-    , slabUsed_( NULL )
-    , slabMax_( NULL )
+    , slabHead_( nullptr )
+    , slabUsed_( nullptr )
+    , slabMax_( nullptr )
     , leakProtect_( leakProtect )
     , checkLifetimeSampler_( impl::memoryTrack() ? impl::memoryTrackingIntervalLifetime() : 0 )
     , slabHeadCheckLifetime_( false )
@@ -5363,7 +5363,7 @@ TemporalBase::attach(
     ( void )::new( static_cast< void * >( slabHead_ )) SlabHead( innerRefs_, runPool_, leakProtect_, checkLifetimeSampler_.sample() );
     slabHeadCheckLifetime_ = slabHead_->checkLifetime_;
     if( slabHeadCheckLifetime_ ) {
-        slabLast_ = NULL;
+        slabLast_ = nullptr;
     }
 }
 
@@ -5407,7 +5407,7 @@ TemporalBase::mapOnCurrentSlab(
     size_t phase,
     size_t align )
 {
-    // On first execution slabHead_ is NULL; however it doesn't matter which branch we take.
+    // On first execution slabHead_ is nullptr; however it doesn't matter which branch we take.
     if( slabHeadCheckLifetime_ ) {
         return mapOnCurrentSlabWithHead< AllocHeadCheckLifetime >( size, sample, phase, align );
     } else {
@@ -5458,7 +5458,7 @@ TemporalBase::map(
 bool
 TemporalBase::isInitialized( void ) const
 {
-    return ( slabHead_ != NULL );
+    return ( slabHead_ != nullptr );
 }
 
 void
@@ -5789,7 +5789,7 @@ ThreadLocalTemporalAffinityFork::ThreadLocalTemporalAffinityFork(
 
 ShutdownDump::~ShutdownDump( void )
 {
-    impl::resourceTraceDump( impl::resourceTraceDumpPhaseAll, true, NULL );
+    impl::resourceTraceDump( impl::resourceTraceDumpPhaseAll, true, nullptr );
 }
 
 /////////////////////
@@ -5802,7 +5802,7 @@ CyclicPoolDescImpl::CyclicPoolDescImpl(
     name_ = name;
     elementBytes_ = 0U;
     poolMin_ = tools::detail::CyclicPoolDesc::slabPoolsMax;
-    std::fill( slabPools_, slabPools_ + slabPoolsMax, static_cast< Pool * >( NULL ));
+    std::fill( slabPools_, slabPools_ + slabPoolsMax, static_cast< Pool * >( nullptr ));
 }
 
 //////////

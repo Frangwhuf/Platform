@@ -46,9 +46,9 @@ void
 impl::UnregisterUnitTest( unittest::UnitTest * test )
 {
   UnitTests & collection( GetUnitTests() );
-  for( UnitTests::iterator i=collection.begin(); i!=collection.end(); ++i ) {
-    if( *i == test ) {
-      *i = collection.back();
+  for( auto && element : collection ) {
+    if( element == test ) {
+      element = collection.back();
       collection.pop_back();
       return;
     }
@@ -81,32 +81,32 @@ impl::UnitTestMain( int, char ** )
   // AutoDispose< Context > context( NewThreadContext( alloca( ContextGetThreadAllocationSize() ) ) );
   boost::format nameFmt( "%s:%s" );
   UnitTests & collection( GetUnitTests() );
-  for( UnitTests::iterator i=collection.begin(); i!=collection.end(); ++i ) {
+  for( auto && test : collection ) {
     // Check against patterns
     bool matched( false );
     if( !patterns.empty() ) {
-      for( Patterns::iterator pi=patterns.begin(); pi!=patterns.end(); ++pi ) {
-            nameFmt % (*i)->file() % (*i)->name();
-            StringId nameId( nameFmt.str() );
+      for( auto && pattern : patterns ) {
+        nameFmt % test->file() % test->name();
+        StringId nameId( nameFmt.str() );
 #ifdef WINDOWS_PLATFORM
-            // TODO: flip backslash to slash in file part.  Better yet, do this
-            // when the flie part is assigned.
+        // TODO: flip backslash to slash in file part.  Better yet, do this
+        // when the flie part is assigned.
 #endif /* WINDOWS_PLATFORM */
-            if( regex_match( nameId.c_str(), *pi ) ) {
-              matched = true;
-              break;  // only need one
-            }
+        if( regex_match( nameId.c_str(), pattern ) ) {
+          matched = true;
+          break;  // only need one
+        }
       }
     } else {
       matched = true;  // no patterns = always match.
     }
     if( matched ) {
       for( uint32 c=0; c<count; ++c ) {
-          //   if( verbose ) {
-          // NOTIFY_INFO( unitCat ) << L"Running test " << (*i)->file() << L":" << (*i)->name() << L"..." << std::endl;
-          //   }
-            (*i)->run();
-            // context->clean();
+        //   if( verbose ) {
+        // NOTIFY_INFO( unitCat ) << L"Running test " << (*i)->file() << L":" << (*i)->name() << L"..." << std::endl;
+        //   }
+        test->run();
+        // context->clean();
       }
     }
   }

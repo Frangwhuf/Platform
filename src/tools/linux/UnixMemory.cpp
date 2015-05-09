@@ -936,9 +936,9 @@ VmemPool::~VmemPool( void )
     // Though the entries in reserved_ were aligned (and padded), we keep the original mmap addresses in
     // addrs_, and that is what we will unmap here.  If releaseReserved() has already been called, we're
     // munmapping some addresses twice. However this is not, of itself, an error.
-    std::for_each( addrs_.begin(), addrs_.end(), [&]( void * site )->void {
+    for( auto && site : addrs_ ) {
         untrackedMunmap( site, largePageSize_ * reservationUnits );
-    });
+    }
 }
 
 Pool::Desc const &
@@ -1316,7 +1316,7 @@ TrackedItems::collect(
     }
     std::unique_lock< std::mutex > l( trackedItemsLock_ );
     vec.reserve( trackedStackTraces_.size() );
-    std::for_each( trackedStackTraces_.begin(), trackedStackTraces_.end(), [ &vec ]( std::pair< TrackedUntrackedStackTrace const, AllocCounts > & v )->void {
+    for( auto && v : tackedStackTraces_ ) {
         vec.push_back( v );
-    });
+    }
 }

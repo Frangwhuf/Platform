@@ -902,7 +902,7 @@ namespace
     static StandardThreadLocalHandle< MonitorLocalInfo > &
     monitorInfoGlobal( void )
     {
-        static StandardThreadLocalHandle< MonitorLocalInfo > * local_ = NULL;
+        static StandardThreadLocalHandle< MonitorLocalInfo > * local_ = nullptr;
         if( !local_ ) {
             monitorInfoGlobalStorage( &local_ );
         }
@@ -993,7 +993,7 @@ namespace tools {
 MonitorDebugInfo::MonitorDebugInfo(
     impl::ResourceSample const & sample,
     unsigned level )
-    : previous_( NULL )
+    : previous_( nullptr )
     , sample_( sample )
     , level_( level )
     , trace_( impl::resourceTraceBuild( sample ))
@@ -1011,8 +1011,8 @@ MonitorDebugInfo::~MonitorDebugInfo( void )
 ///////////////////
 
 MonitorLocalInfo::MonitorLocalInfo( void )
-    : cvarLock_( NULL )
-    , debug_( NULL )
+    : cvarLock_( nullptr )
+    , debug_( nullptr )
     , isRt_( false )
 {
 }
@@ -1041,7 +1041,7 @@ MonitorLocalInfo::pop(
     TOOLS_ASSERT( !debug_ );
     TOOLS_ASSERT( cvarLock_ == lock );
     TOOLS_ASSERT( !!lock->lock_ );
-    cvarLock_ = NULL;
+    cvarLock_ = nullptr;
 }
 
 void
@@ -1079,7 +1079,7 @@ MonitorLocalInfo::pop(
 {
     TOOLS_ASSERT( debug_ == info );
     debug_ = info->previous_;
-    info->previous_ = NULL;
+    info->previous_ = nullptr;
 }
 
 ////////////////////
@@ -1129,9 +1129,9 @@ VerifyMonitor::VerifyMonitor(
     , everAquiredFromRt_( false )
     , contendedNsec_( 0ULL )
     , prevRt_( false )
-    , prevTrace_( NULL )
+    , prevTrace_( nullptr )
     , currRt_( false )
-    , currTrace_( NULL )
+    , currTrace_( nullptr )
 {
     // Make sure the thread local information is initialized
     monitorInfoGlobal().get();
@@ -1179,7 +1179,7 @@ VerifyMonitor::enter(
         update( res, info );
         return static_cast< VerifyMonitorLock * >( this );
     } else if( tryOnly ) {
-        return static_cast< Disposable * >( NULL );
+        return static_cast< Disposable * >( nullptr );
     }
     if( isRt && !!currTrace_ && !currRt_ ) {
         // TODO: lock a priority inversion
@@ -1227,9 +1227,9 @@ LocalHandleRecord::~LocalHandleRecord( void )
     void * itf = tlsItf_;
     LocalManager * parent = parent_;
 #ifdef TOOLS_DEBUG
-    factory_ = NULL;
-    tlsItf_ = NULL;
-    parent_ = NULL;
+    factory_ = nullptr;
+    tlsItf_ = nullptr;
+    parent_ = nullptr;
 #endif // TOOLS_DEBUG
     // Make certain all of the instances are removed.
     parent->endHandle( this );
@@ -1261,7 +1261,9 @@ LocalManager::LocalManager( void )
 LocalManager::~LocalManager( void )
 {
     // Ensure all the thread content is torn down
-    std::for_each( threads_.begin(), threads_.end(), []( PerThreadLocalManager * i ) { delete i; });
+    for( auto && th : threads_ ) {
+        delete th;
+    }
 }
 
 void
@@ -1287,12 +1289,12 @@ LocalManager::endHandle(
     {
         AutoDispose<> l_( threadLock_->enter() );
         disposables.reserve( threads_.size() );
-        std::for_each( threads_.begin(), threads_.end(), [&]( PerThreadLocalManager * i ) {
-            AutoDispose<> h( std::move( i->endHandle( handle )));
+        for( auto && th : threads_ ) {
+            AutoDispose<> h( std::move( th->endHandle( handle )));
             if( !!h ) {
                 disposables.push_back( std::move( h ));
             }
-        });
+        }
     }
 }
 
@@ -1317,7 +1319,7 @@ LocalManager::endThread( void )
         threads_.pop_back();
     }
     // Clear the slot, just in case.
-    impl::threadLocalSet( tlsThread_, NULL );
+    impl::threadLocalSet( tlsThread_, nullptr );
     // Teardown any thread-local services
     delete thread;
 }
@@ -1388,7 +1390,7 @@ PerThreadLocalManager::endHandle(
         handles_.erase( i );
         return std::move( r );
     }
-    return NULL;
+    return nullptr;
 }
 
 /////////////////////////////
@@ -1396,7 +1398,7 @@ PerThreadLocalManager::endHandle(
 /////////////////////////////
 
 MonitorPool::PooledMonitor::PooledMonitor( void )
-    : inner_( NULL )
+    : inner_( nullptr )
 {
 }
 
@@ -1548,7 +1550,7 @@ RwMonitorImpl::WriterMonitor::enter(
     AutoDispose<> l_( rw_->config_->enter( tryOnly ) );
     if( !l_ ) {
         TOOLS_ASSERT( tryOnly );
-        return NULL;
+        return nullptr;
     }
     config_.reset( std::move( l_ ));
 
@@ -1557,13 +1559,13 @@ RwMonitorImpl::WriterMonitor::enter(
     if( locks_.capacity() < rw_->readers_.size() ) {
         locks_.reserve( rw_->readers_.size() * 2U );
     }
-    for( auto i=rw_->readers_.begin(); i!=rw_->readers_.end(); ++i ) {
-        l_.reset( (*i)->inner()->enter( tryOnly ));
+    for( auto && reader : rw_->readers_ ) {
+        l_.reset( reader->inner()->enter( tryOnly ));
         if( !l_ ) {
             TOOLS_ASSERT( tryOnly );
             // We failed during a try, rewind.
             dispose();
-            return NULL;
+            return nullptr;
         }
         locks_.push_back( l_.release() );
     }
@@ -1655,7 +1657,7 @@ ConditionVarMonitorUnlock::dispose( void )
     // Pop before we've actually released
     monitorInfoGlobal()->pop( &this_->inner_ );
     AutoDispose<> lock( this_->inner_.lock_ );
-    this_->inner_.lock_ = NULL;
+    this_->inner_.lock_ = nullptr;
 }
 
 //////////////////////
@@ -1668,7 +1670,7 @@ ConditionVarMonitor::ConditionVarMonitor(
 {
     inner_.monitor_ = inner.release();
     inner_.cvar_ = &innerVar;
-    inner_.lock_ = NULL;
+    inner_.lock_ = nullptr;
 }
 
 ConditionVarMonitor::~ConditionVarMonitor( void )
@@ -1689,7 +1691,7 @@ ConditionVarMonitor::enter(
         monitorInfoGlobal()->push( &inner_ );
         return static_cast< ConditionVarMonitorUnlock * >( this );
     }
-    return NULL;
+    return nullptr;
 }
 
 bool
@@ -1746,11 +1748,11 @@ TaskLocalQueue::TaskLocalQueue(
 	TaskLocalStat * s )
 	: stat_( s )
 	, head_( 0U )
-	, queue_( NULL )
-	, queueAll_( NULL )
+	, queue_( nullptr )
+	, queueAll_( nullptr )
 	, ordered_( false )
 {
-	std::fill( spawns_, spawns_ + spawnsPreCacheMax, static_cast<Task *>( NULL ) );
+	std::fill( spawns_, spawns_ + spawnsPreCacheMax, static_cast<Task *>( nullptr ) );
 }
 
 TaskLocalQueue::~TaskLocalQueue( void )
@@ -1792,7 +1794,7 @@ TaskLocalQueue::push(
 	Task * t )
 {
 	TOOLS_ASSERT( !t->nextTask_ );
-	if( atomicCas< Task *, Task * >( spawns_ + stat_->tail_, NULL, t ) == NULL ) {
+	if( atomicCas< Task *, Task * >( spawns_ + stat_->tail_, nullptr, t ) == nullptr ) {
 		// Advance the tail
 		stat_->tail_ = ( stat_->tail_ + 1U ) & ( spawnsPreCacheMax - 1U );
 		return stat_->pushed();
@@ -1807,12 +1809,12 @@ TaskLocalQueue::pushMany(
 	ConditionVar & idle )
 {
 	if( !t ) {
-		return NULL;
+		return nullptr;
 	}
 	// Enqueue all but the last.
 	while( !!t->nextTask_ ) {
 		Task * next = t->nextTask_;
-		t->nextTask_ = NULL;
+		t->nextTask_ = nullptr;
 		if( push( t ) ) {
 			idle.signal();
 		}
@@ -1827,14 +1829,14 @@ TaskLocalQueue::popSpawns( void )
 	size_t base = head_;
 	for( size_t i=0; i!=spawnsPreCacheMax; ++i ) {
 		size_t spawn = ( base + i ) & ( spawnsPreCacheMax - 1U );
-		Task * t = atomicExchange< Task *, Task * >( spawns_ + spawn, NULL );
+		Task * t = atomicExchange< Task *, Task * >( spawns_ + spawn, nullptr );
 		if( !!t ) {
 			head_ = ( spawn + 1U ) & ( spawnsPreCacheMax - 1U );
 			TOOLS_ASSERT( !t->nextTask_ );
 			return t;
 		}
 	}
-	return NULL;
+	return nullptr;
 }
 
 Task *
@@ -1843,12 +1845,12 @@ TaskLocalQueue::popQueueSecond(
 	bool /*tryWait*/ )
 {
 	if( !queue_ ) {
-		return NULL;
+		return nullptr;
 	}
 	// TODO: try wait
 	AutoDispose<> l( stat_->lock_->enter() );
 	if( !queue_ ) {
-		return NULL;
+		return nullptr;
 	}
 	Task ** base = &queue_->nextTask_;
 	Task * ret;
@@ -1861,7 +1863,7 @@ TaskLocalQueue::popQueueSecond(
 	}
 	// Remove this range form the queue
 	*base = *tail;
-	*tail = NULL;
+	*tail = nullptr;
 	return ret;
 }
 
@@ -1870,7 +1872,7 @@ TaskLocalQueue::popQueue(
 	size_t maximum )
 {
 	if( !queue_ ) {
-		return NULL;
+		return nullptr;
 	}
 	AutoDispose<> l( stat_->lock_->enter() );
 	Task * old;
@@ -1878,7 +1880,7 @@ TaskLocalQueue::popQueue(
 	do {
 		old = queue_;
 		if( !old ) {
-			return NULL;
+			return nullptr;
 		}
 		size_t found = 1U;
 		for( newQueue=&old->nextTask_; !!*newQueue; newQueue=&(*newQueue)->nextTask_ ) {
@@ -1888,7 +1890,7 @@ TaskLocalQueue::popQueue(
 			++found;
 		}
 	} while( atomicCas( &queue_, old, *newQueue ) != old );
-	*newQueue = NULL;
+	*newQueue = nullptr;
 	return old;
 }
 
@@ -1896,9 +1898,9 @@ Task *
 TaskLocalQueue::popQueueAll( void )
 {
 	if( !queueAll_ ) {
-		return NULL;
+		return nullptr;
 	}
-	return atomicExchange( &queueAll_, static_cast< Task *>( NULL ));
+	return atomicExchange( &queueAll_, static_cast< Task *>( nullptr ));
 }
 
 ///////////////
@@ -1908,8 +1910,8 @@ TaskLocalQueue::popQueueAll( void )
 OrderedTasks::OrderedTasks(
 	StringId const & n )
 	: name_( n )
-	, incoming_( NULL )
-	, ordered_( NULL )
+	, incoming_( nullptr )
+	, ordered_( nullptr )
 {
 }
 
@@ -1931,15 +1933,15 @@ Task *
 OrderedTasks::pop( void )
 {
 	if( !ordered_ && !incoming_ ) {
-		return NULL;
+		return nullptr;
 	}
 	Task * t = ordered_;
 	if( !!t ) {
 		ordered_ = t->nextTask_;
-		t->nextTask_ = NULL;
+		t->nextTask_ = nullptr;
 		return t;
 	}
-	t = atomicExchange( &incoming_, static_cast< Task * >( NULL ));
+	t = atomicExchange( &incoming_, static_cast< Task * >( nullptr ));
 	if( !t || !t->nextTask_ ) {
 		return t;
 	}
@@ -1951,7 +1953,7 @@ OrderedTasks::pop( void )
 	}
 	t = ordered_;
 	ordered_ = t->nextTask_;
-	t->nextTask_ = NULL;
+	t->nextTask_ = nullptr;
 	return t;
 }
 
@@ -1987,7 +1989,7 @@ OrderedTasksSet::push(
 			if( !newQueue.get() ) {
 				newQueue.reset( new OrderedTasks( queue ) );
 			}
-			if( atomicCas( &tasks_[ bucket ], static_cast< OrderedTasks * >( NULL ), newQueue.get() ) == NULL ) {
+			if( atomicCas( &tasks_[ bucket ], static_cast< OrderedTasks * >( nullptr ), newQueue.get() ) == nullptr ) {
 				push( bucket, t );
 				newQueue.release();
 				return;
@@ -2030,7 +2032,7 @@ OrderedTasksSet::pop( void )
 			return ret;
 		}
 	} while( nextBucket_ != first );
-	return NULL;
+	return nullptr;
 }
 #ifdef WINDOWS_PLATFORM
 #  pragma warning( default : 4706 )
@@ -2219,7 +2221,7 @@ AutoDispose< Request >
 TaskSchedImpl::spawnAll(
 	Task & t )
 {
-	t.nextTask_ = NULL;
+	t.nextTask_ = nullptr;
 	if( atomicRead( &shutdown_ )) {
 		return new SyncSpawnReq( t );
 	}
@@ -2243,7 +2245,7 @@ TaskSchedImpl::proxy(
     void * callSite )
 {
 	if( !inner ) {
-		return static_cast< Request * >( NULL );
+		return static_cast< Request * >( nullptr );
 	}
 	return new( aff, TOOLS_RESOURCE_SAMPLE_CALLER( sizeof( ProxyStartReq ))) ProxyStartReq( std::move( inner ), *this, param, !!callSite ? callSite : TOOLS_RETURN_ADDRESS() );
 }
@@ -2282,7 +2284,7 @@ TaskSchedImpl::serviceStart( void )
 {
 	// Start all threads
 	forkAll_ = std::move( ThreadScheduler::fork( innerScheduler_.forkAll( "TaskScheduler", this->toThunk< &TaskSchedImpl::threadEntry >() ), this ));
-    return static_cast< Request * >( NULL );
+    return static_cast< Request * >( nullptr );
 }
 
 AutoDispose< Request >
@@ -2391,9 +2393,9 @@ TaskSchedImpl::threadEntry( void )
 			do {
 				Task * run = t;
 				t = t->nextTask_;
-				run->nextTask_ = NULL;
+				run->nextTask_ = nullptr;
                 measure.addTask( WorkDoneItem( run ));
-                runAndReport( run, NULL, detector.get(), measure.lastTask() );
+                runAndReport( run, nullptr, detector.get(), measure.lastTask() );
 			} while( !!t );
 			// try again
 			continue;
@@ -2618,10 +2620,10 @@ TaskSchedStop::start( void )
 SchedulerBind::SchedulerBind( void )
     : envRole_( StaticStringId( "[Unset]" ))
     , current_( &synchronousScheduler_ )
-    , queue_( NULL )
+    , queue_( nullptr )
     , full_( false )
     , lastTime_( 0 )
-    , capQueue_( NULL )
+    , capQueue_( nullptr )
 {
 }
 
@@ -2633,7 +2635,7 @@ SchedulerBind::poke(
     spawns_.events_ = execs_.events_ = 0;
     lastTime_ = impl::getHighResTime();
     serviceTime_ = 0;
-    capQueue_ = NULL;
+    capQueue_ = nullptr;
 }
 
 void
@@ -2723,7 +2725,7 @@ SynchronousSched::proxy(
     void * callSite )
 {
 	if( !inner ) {
-		return static_cast< Request * >( NULL );
+		return static_cast< Request * >( nullptr );
 	}
 	ThreadScheduler * current = localScheduler_->current_;
 	if( current == &synchronousScheduler_ ) {
@@ -2772,7 +2774,7 @@ SyncSpawnReq::start( void )
     auto before = impl::getHighResTime();
 	task_.execute();
     auto after = impl::getHighResTime();
-    reportRunTime( callSite, before, after, NULL, 1000U );
+    reportRunTime( callSite, before, after, nullptr, 1000U );
 	finish();
 }
 
@@ -2781,7 +2783,7 @@ SyncSpawnReq::start( void )
 ///////////////
 
 TaskAllEntry::TaskAllEntry( void )
-	: parent_( NULL )
+	: parent_( nullptr )
 {
 }
 
@@ -3228,9 +3230,9 @@ VerifyStaticMonitor::VerifyStaticMonitor(
     , policy_( policy )
     , everRealTime_( false )
     , prevRealTime_( false )
-    , prevTrace_( NULL )
+    , prevTrace_( nullptr )
     , curRealTime_( false )
-    , curTrace_( NULL )
+    , curTrace_( nullptr )
 {
     // Make sure the thread-local data is initialized
     monitorInfoGlobal().get();
@@ -3257,7 +3259,7 @@ VerifyStaticMonitor::enter(
     AutoDispose<> tryEnter( inner_->enter( res, true ));
     if( !tryEnter && tryOnly ) {
         // oh well
-        return NULL;
+        return nullptr;
     }
     if( !!tryEnter ) {
         update( res );

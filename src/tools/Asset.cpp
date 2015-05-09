@@ -60,7 +60,7 @@ tools::AssetPathParent( void )
 
 // This is a system internal type and applies to every actually loaded singleton
 // singleton::getInterface - if singleton_ and Ready/Reloadable, pass through to singleton
-//   if Invalid/NotFound try to get at some appropriate ErrorAsset, else null
+//   if Invalid/NotFound try to get at some appropriate ErrorAsset, else nullptr
 //   need to support something to get 'this' for equality compares
 // singleton::name - name of just this part of the hierarchy
 // singleton::path - a full path from the root to this asset, could be used to load this
@@ -116,7 +116,7 @@ InternalAssetSingleton::InternalAssetSingleton( AutoDispose< Asset > & parent, A
     parentUpdate();
     if( !loader_ ) {
         // No loader, the factory must already have what it needs
-        loaded(NULL);
+        loaded(nullptr);
     } else {
         Subscribable * subable = loader_->getInterface< Subscribable >();
         if( !!subable ) {
@@ -157,7 +157,7 @@ InternalAssetSingleton::dispose( void )
 void *
 InternalAssetSingleton::getInterface( StringId const & itf ) const throw()
 {
-    void * ret = NULL;
+    void * ret = nullptr;
     if( itf == nameOf< Asset >() ) {
         ret = static_cast< Asset * >( const_cast< InternalAssetSingleton * >( this ));
     } else if( itf == nameOf< AssetSingleton >() ) {
@@ -178,7 +178,7 @@ InternalAssetSingleton::load( StringId const & relpath ) throw()
     if( relpath == AssetPathThis() ) {
         // want another copy of this
         if( state_.get() == detail::AssetStateDying ) {
-            return NULL;
+            return nullptr;
         }
         atomicRef( &refs_ );
         return this;
@@ -196,21 +196,21 @@ InternalAssetSingleton::load( StringId const & relpath ) throw()
             std::string nameStr( name_.c_str() );
             std::string relpathStr( relpath.c_str() );
             AutoDispose<> l( childrenLock_->enter() );
-            Asset * child = NULL;
+            Asset * child = nullptr;
             StringId residuePath;
-            for( auto iter=children_.begin(); iter!=children_.end(); ++iter ) {
-                if( iter->first == relpath ) {
+            for( auto && element : children_ ) {
+                if( element.first == relpath ) {
                     // full match!  Woo!
-                    child = iter->second.get();
+                    child = element.second.get();
                     residuePath = AssetPathThis();
                     break;
                 } else {
-                    std::string childStr( iter->first.c_str() );
-                    auto loc = relpathStr.find( iter->first.c_str() );
+                    std::string childStr( element.first.c_str() );
+                    auto loc = relpathStr.find( element.first.c_str() );
                     if( loc != 0 ) {
                         // This child matches the front of the path we're looking for, explore this further.
-                        child = iter->second.get();
-                        residuePath = relpathStr.substr( iter->first.length() );
+                        child = element.second.get();
+                        residuePath = relpathStr.substr( element.first.length() );
                         break;
                     }
                 }
@@ -247,7 +247,7 @@ InternalAssetSingleton::load( StringId const & relpath ) throw()
         break;
     case detail::AssetStateDying:
         // We're on our way out.
-        return NULL;
+        return nullptr;
     case detail::AssetStateNotFound:
     case detail::AssetStateInvalid:
         atomicRef( &refs_ );
@@ -255,7 +255,7 @@ InternalAssetSingleton::load( StringId const & relpath ) throw()
     default:
         break;
     }
-    return NULL;
+    return nullptr;
 }
 
 AutoDispose< Asset >
@@ -263,7 +263,7 @@ InternalAssetSingleton::reload( void ) throw()
 {
     auto state = state_.get();
     if(( state == detail::AssetStateDying ) || !parent_ ) {
-        return NULL;
+        return nullptr;
     }
     if( state != detail::AssetStateReloadable ) {
         return this;
@@ -417,7 +417,7 @@ InternalAssetSingleton::parentUpdate( void )
 
 // This is a system internal type and applies to every per-instance type.
 // per_inst::getInterface - if instance_ and Ready or Reloadable, pass through to instance
-//    if Invalid/NotFound pass through to singleton (if present), else null
+//    if Invalid/NotFound pass through to singleton (if present), else nullptr
 //    need to support something to get the inner singleton asset
 // per_inst::name - name of just this part of the heirarchy
 // per_inst::path - a full path from the root to this asset, could be used to load this
@@ -517,7 +517,7 @@ InternalAssetPerInstance::dispose( void )
 void *
 InternalAssetPerInstance::getInterface( StringId const & itf ) const throw()
 {
-    void * ret = NULL;
+    void * ret = nullptr;
     if( itf == nameOf< Asset >() ) {
         ret = singleton_.get();
     } else {
@@ -606,7 +606,7 @@ InternalAssetPerInstance::singletonUpdate( void )
                 target_ = detail::AssetStateReady;
                 instanceReq_ = semantic->newInstance( instance_ );
                 if( !instanceReq_ ) {
-                    instanceCompleted( NULL );
+                    instanceCompleted( nullptr );
                 } else {
                     instanceReq_->start( toCompletion< &InternalAssetPerInstance::instanceCompleted >() );
                 }
@@ -629,7 +629,7 @@ InternalAssetPerInstance::singletonUpdate( void )
                 target_ = detail::AssetStateReloadable;
                 instanceReq_ = semantic->newInstance( instance_ );
                 if( !instanceReq_ ) {
-                    instanceCompleted( NULL );
+                    instanceCompleted( nullptr );
                 } else {
                     instanceReq_->start( toCompletion< &InternalAssetPerInstance::instanceCompleted >() );
                 }
@@ -944,7 +944,7 @@ InternalAssetFullLoadWrapper::dispose( void )
 void *
 InternalAssetFullLoadWrapper::getInterface( StringId const & itf ) const throw()
 {
-    void * ret = NULL;
+    void * ret = nullptr;
     if( itf == nameOf< Asset >() ) {
         ret = static_cast< Asset * >( const_cast< InternalAssetFullLoadWrapper * >( this ));
     } else if( !!asset_ ) {
@@ -959,7 +959,7 @@ InternalAssetFullLoadWrapper::load( StringId const & relpath ) throw()
     if( relpath == AssetPathThis() ) {
         // want another copy of 'this'
         if( parent_->status() == detail::AssetStateDying ) {
-            return NULL;
+            return nullptr;
         }
         if( !asset_ ) {
             atomicRef( &refs_ );
@@ -981,7 +981,7 @@ InternalAssetFullLoadWrapper::reload( void ) throw()
         return asset_->reload();
     }
     if( parent_->status() == detail::AssetStateDying ) {
-        return NULL;
+        return nullptr;
     }
     return this;
 }
@@ -1126,7 +1126,7 @@ NullLoaderImpl::getInterface( StringId const & itf ) const throw()
     if( nameOf< NullLoaderImpl >() == itf ) {
         return const_cast< NullLoaderImpl * >(this);
     }
-    return NULL;
+    return nullptr;
 }
 
 void
@@ -1202,7 +1202,7 @@ struct TestAssetSingleton
 
 TestAssetFactory::TestAssetFactory( void )
     : singletons_( 0U )
-    , root_( NULL )
+    , root_( nullptr )
 {
 }
 
@@ -1247,7 +1247,7 @@ TestAssetRoot::dispose( void )
 void *
 TestAssetRoot::getInterface( StringId const & ) const throw()
 {
-    return NULL;
+    return nullptr;
 }
 
 AutoDispose< Asset >
@@ -1326,7 +1326,7 @@ TestAssetSingleton::~TestAssetSingleton( void )
 void *
 TestAssetSingleton::getInterface( StringId const & ) const throw()
 {
-    return NULL;
+    return nullptr;
 }
 
 AutoDispose< Request >
@@ -1334,7 +1334,7 @@ TestAssetSingleton::newInstance( AutoDispose< AssetInstance > & inst )
 {
     // TODO: sometimes return a request, sometimes return not this
     inst.reset( this );
-    return static_cast< Request * >( NULL );
+    return static_cast< Request * >( nullptr );
 }
 
 AutoDispose< AssetLoader >
