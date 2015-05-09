@@ -321,7 +321,7 @@ struct EnvTestService {
 
 struct EnvTestImpl
     : EnvTestService
-    , StandardService< EnvTestImpl, boost::mpl::list< EnvTestService >::type >
+    , tools::detail::StandardNoBindService< EnvTestImpl, boost::mpl::list< EnvTestService >::type >
 {
     EnvTestImpl( Environment & );
 
