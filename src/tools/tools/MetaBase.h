@@ -124,9 +124,9 @@ namespace tools {
 
             // _NOT_ inlined, so that we can establish a firewall.
             TOOLS_NO_INLINE static InterfaceT * init( void ) throw() {
-                InterfaceT * __restrict new_ = staticServiceCacheInit( static_cast< ServiceT *** >( 0 ), static_cast< TypeT *** >( 0 ));
+                InterfaceT * __restrict new_ = staticServiceCacheInit( static_cast< ServiceT *** >( nullptr ), static_cast< TypeT *** >( nullptr ));
                 if( !!new_ ) {
-                    staticServiceCacheOnce( new_, static_cast< ServiceT *** >( 0 ), static_cast< TypeT *** >( 0 ));
+                    staticServiceCacheOnce( new_, static_cast< ServiceT *** >( nullptr ), static_cast< TypeT *** >( nullptr ));
                 }
                 *storage() = new_;
                 return new_;

@@ -308,28 +308,28 @@ namespace tools {
         TOOLS_FORCE_INLINE uint32 defineHashAnyInit( AnyT *** )
         {
             // I use typeid(...).name() rather than NameOf because I don't want to involve StringId here.
-            return tools::impl::hashMix( 0x6CA99934U, static_cast< uint64 >( reinterpret_cast< ptrdiff_t >( typeid( AnyT ).name() )));
+            return tools::impl::hashMix( static_cast< uint64 >( reinterpret_cast< ptrdiff_t >( typeid( AnyT ).name() )), static_cast< uint32 >( 0x6CA99934U ));
         }
 
         // Some constant defaults for common types to save some time/CPU
         TOOLS_FORCE_INLINE uint32 defineHashAnyInit( uint64 *** )
         {
-            return 0xE6FAEA19U;
+            return static_cast< uint32 >( 0xE6FAEA19U );
         }
 
         TOOLS_FORCE_INLINE uint32 defineHashAnyInit( sint64 *** )
         {
-            return 0x37167F14U;
+            return static_cast< uint32 >( 0x37167F14U );
         }
 
         TOOLS_FORCE_INLINE uint32 defineHashAnyInit( uint32 *** )
         {
-            return 0xF86EB4E7U;
+            return static_cast< uint32 >( 0xF86EB4E7U );
         }
 
         TOOLS_FORCE_INLINE uint32 defineHashAnyInit( sint32 *** )
         {
-            return 0xE57A202EU;
+            return static_cast< uint32 >( 0xE57A202EU );
         }
 
         template< typename AnyT >

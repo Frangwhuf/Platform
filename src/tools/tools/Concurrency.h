@@ -1967,7 +1967,7 @@ TOOLS_WARNINGS_RESTORE
     //}
     template< typename AnyT >
     TOOLS_FORCE_INLINE tools::FlagPointer< AnyT > atomicCas( tools::FlagPointer< AnyT > volatile * const site, tools::FlagPointer< AnyT > oldValue, tools::FlagPointer< AnyT > const & newValue ) {
-        oldValue.p_ = *::tools::atomicCas( &site->p_, oldValue.p_, newValue.p_ );
+        oldValue.p_ = ::tools::atomicCas( &site->p_, oldValue.p_, newValue.p_ );
         return oldValue;
     }
 

@@ -62,7 +62,7 @@ namespace tools {
     template< typename PhantomT >
     inline AutoDispose<> phantomTryBindPrototype( PhantomT *** phantom = 0 )
     {
-        return !phantomLocal( phantom ).isCloaked() ? phantomBindPrototype( phantom ).select() : NULL;
+        return !phantomLocal( phantom ).isCloaked() ? phantomBindPrototype( phantom ).select() : nullptr;
     }
 
     // All (participating) threads must return to idle to prove there are no outstanding references on
@@ -120,7 +120,7 @@ namespace tools {
     {
         StandardPhantomSlistElement( void )
         {
-            slistNext_.reset( /*tools::FlagPointer< ElementT >::make()*/ NULL );
+            slistNext_.reset( /*tools::FlagPointer< ElementT >::make()*/ nullptr );
         }
 
         tools::FlagPointer< ElementT > volatile slistNext_;
@@ -199,7 +199,7 @@ namespace tools {
                     if( !func( *elem )) {
                         break;
                     }
-                    elem = tools::phantomSlistNext( elem )->get();
+                    elem = tools::phantomSlistNext( *elem )->get();
                 } while( !!elem );
             }
             return ret;
@@ -219,7 +219,7 @@ namespace tools {
             }
             TOOLS_ASSERT( tools::phantomVerifyIsCloaked< PhantomT >() );
             size_t ret = 0U;
-            PhantomCloak * phantoms = &phantomLocal< PhantomT >();
+            PhantomCloak & phantoms = phantomLocal< PhantomT >();
             while( ElementT * elem = root.get() ) {
                 ElementT * next;
                 tools::atomicTryUpdate( tools::phantomSlistNext( *elem ), [=, &next]( LinkType & ref )->bool {
@@ -231,7 +231,7 @@ namespace tools {
                     return false;
                 });
                 // Send element off to the land of wind and ghosts
-                phantoms->finalize( tools::AutoDispose< tools::Weakling >( elem ));
+                phantoms.finalize( tools::AutoDispose< tools::Weakling >( elem ));
                 ++ret;
                 root.reset( next );
             }
@@ -241,7 +241,7 @@ namespace tools {
         // Conditionally push an element to the front of the list. The provided predicate may read the next
         // element and modify the target to ensure it sorts earlier. The signature for the predicate is:
         //     (LinkType &)->bool
-        // The parameter will be NULL if the list is empty. If the predicate returns false, the insert is
+        // The parameter will be nullptr if the list is empty. If the predicate returns false, the insert is
         // aborted. The method returns a bool indicating if the insert happened.
         template< typename PredicateF >
         bool
@@ -276,8 +276,8 @@ namespace tools {
         // Walk the list, applying a transformation as we go, doing maintainence as we go. The signature
         // of the transformation function is:
         //     (ElementT * prev, ElementT * & current)->bool
-        // 'prev' will be NULL for the first element of the list. The transform is allowed to reset 'current'.
-        // If the provided 'current' is NULL, this is the end of the list. Returning false terminates the
+        // 'prev' will be nullptr for the first element of the list. The transform is allowed to reset 'current'.
+        // If the provided 'current' is nullptr, this is the end of the list. Returning false terminates the
         // transform. If the the transformation inserts an element, the current node will visited again.
         // If 'current' is unchanged, the transform advances to the next node. This method returns a count
         // of the number of elements removed.
@@ -289,19 +289,19 @@ namespace tools {
             TOOLS_ASSERT( tools::phantomVerifyIsCloaked< PhantomT >() );
             size_t ret = 0U;
             LinkType volatile * transIter = &root_;
-            ElementT * prev = NULL;
+            ElementT * prev = nullptr;
             for( ;; ) {
                 ElementT * extracted;
                 ElementT * inserted;
                 LinkType volatile * transReset;
                 ElementT * transPrevReset;
                 atomicTryUpdate( transIter, [=, &extracted, &inserted, &transReset, &transPrevReset]( LinkType & ref )->bool {
-                    extracted = NULL;
-                    inserted = NULL;
+                    extracted = nullptr;
+                    inserted = nullptr;
                     if( isEnd( ref )) {
                         // current position was removed, start over
                         transReset = &this->root_;
-                        transPrevReset = NULL;
+                        transPrevReset = nullptr;
                         return false;
                     }
                     // By default don't move forward
@@ -320,13 +320,13 @@ namespace tools {
                     }
                     if( !func( prev, sample )) {
                         // Terminate transformation
-                        transReset = NULL;
+                        transReset = nullptr;
                         return false;
                     } else if( sample == ref.get() ) {
                         // No change
                         if( !sample ) {
                             // All done
-                            transReset = NULL;
+                            transReset = nullptr;
                         } else if( isEnd( *tools::phantomSlistNext( *sample ))) {
                             // Marked for remove
                             extracted = sample;
@@ -494,8 +494,8 @@ namespace tools {
         // what it wants to do. Once inserted, the new value will be used to determine equivalence. The
         // signature for the update function is:
         //     (ElementT *&)->bool
-        // The parameter will be NULL at the end of the list. Not modifying the parameter indicates no
-        // update. Setting the parameter to NULL, indicates that the element is to be removed. Setting
+        // The parameter will be nullptr at the end of the list. Not modifying the parameter indicates no
+        // update. Setting the parameter to nullptr, indicates that the element is to be removed. Setting
         // the parameter to anything else indicates a change in the element. If the replace fails, this
         // new element will be finalized. Returning false indicates that the desired change was made.
         // The signature for the equivalence function is:
@@ -672,7 +672,7 @@ namespace tools {
         forEach(
             VisitorF const & visitor ) const
         {
-            std::for_each( buckets_, buckets_ + bucketsUsed, [&]( BucketT & b )->void {
+            std::for_each( buckets_, buckets_ + bucketsUsed, [&]( BucketT const & b )->void {
                 b.peek( visitor );
             });
         }
@@ -684,14 +684,12 @@ namespace tools {
         template< typename VisitorF >
         unsigned
         forEachKey(
-            KeyT const & key,
+            KeyT const & __restrict key,
             VisitorF const & visitor )
         {
-            KeyT const * __restrict ref = &key;
-            return buckets_[ tools::impl::hashAny( key, hashInit_ ) % bucketsUsed ].peek( [&]( ElementT & elem )->bool {
-                ElementT * __restrict elemRef = &elem;
-                KeyT const * __restrict elemKeyRef = &keyOf( *elemRef );
-                return ( *elemKeyRef < *ref ) || !( ( *ref < *elemKeyRef ) || !visitor( *elemRef ));
+            return buckets_[ tools::impl::hashAny( key, hashInit_ ) % bucketsUsed ].peek( [&key, &visitor]( ElementT & __restrict elem )->bool {
+                KeyT const & __restrict elemKeyRef = keyOf( elem );
+                return ( elemKeyRef < key ) || !( ( key < elemKeyRef ) || !visitor( elem ));
             });
         }
 
@@ -780,8 +778,8 @@ namespace tools {
         // Assuming the user desires to have at most one element matching a given key, rather than modifying
         // the element in place we allocate a new element. This can frequently be simplier for maintining
         // consistancy. This new element will be the result of a given function. The function will be
-        // presented with the current element for the key. If this is NULL, no current element exists. The
-        // function may choose to return the same element, indicating no change. It can also return NULL,
+        // presented with the current element for the key. If this is nullptr, no current element exists. The
+        // function may choose to return the same element, indicating no change. It can also return nullptr,
         // indicating the element is to be removed. Or lastly, it can create a new element, indicating an
         // update. If the replacement fails (due to a race), the function will be given another opportunity
         // to evaluate what it wants to do. The signature of the function is:
@@ -800,8 +798,8 @@ namespace tools {
                         return true;
                     }
                     if( key < keyOf( *prev )) {
-                        *ref = NULL;
-                        prev = NULL;
+                        ref = nullptr;
+                        prev = nullptr;
                     }
                 }
                 gen( ref );
@@ -831,31 +829,31 @@ namespace tools {
                 return true;
             };
             std::for_each( buckets_, buckets_ + bucketsUsed, [&]( BucketT const & b )->void {
-                prev = NULL;  // new bucket, thus no overlap
+                prev = nullptr;  // new bucket, thus no overlap
                 b.peek( wrap );
             });
         }
 
         // Visit elements matching a given key. The signature of the visitor is:
         //     (ElementT *)->void
-        // If no element matches, NULL will be passed to the visitor.
+        // If no element matches, nullptr will be passed to the visitor.
         template< typename VisitF >
         void
         find(
             KeyT const & key,
             VisitF const & visitor )
         {
-            ElementT * elem = NULL;
-            buckets_[ tools::impl::hashAny( key, hashInit_ ) % bucketsUsed ].peek( [&]( ElementT & test )->bool {
-                ElementT * __restrict ref = &test;
-                KeyT const * __restrict refKey = &keyOf( *ref );
-                if( *refKey < key ) {
-                    return true;
+            ElementT * elem = nullptr;
+            buckets_[ tools::impl::hashAny( key, hashInit_ ) % bucketsUsed ].peek( [&]( ElementT & __restrict test )->bool {
+                KeyT const & __restrict refKey = keyOf( test );
+                bool ret = ( refKey < key );
+                if( ret ) {
+                    return ret;
                 }
-                if( !( key < *refKey )) {
+                if( !( key < refKey )) {
                     elem = &test;
                 }
-                return false;
+                return ret;
             });
             visitor( elem );
         }

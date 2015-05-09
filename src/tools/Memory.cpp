@@ -403,7 +403,7 @@ namespace {
     {
         struct FanoutPool
             : Pool
-            , StandardDisposable< FanoutPool, Disposable, AllocStatic< Platform > >
+            , StandardDisposable< FanoutPool, Disposable, AllocStatic< Platform >>
         {
             FanoutPool( AffinityInherentMaster &, StandardThreadLocalHandle< AffinityInherentThreadLocal > &, BinaryMasterSize );
             // Pool
@@ -630,7 +630,7 @@ namespace {
 
     struct VerifyPool
         : VerifyPoolBase
-        , StandardDisposable< VerifyPool >
+        , StandardDisposable< VerifyPool, Disposable, AllocStatic< Platform >>
     {
         VerifyPool( unsigned, Pool &, impl::ResourceTrace *, size_t );
     };
@@ -688,7 +688,7 @@ namespace {
 
     struct VerifyAffinity
         : VerifyAffinityBase
-        , StandardDisposable< VerifyAffinity, Disposable, AllocStatic< Platform > >
+        , StandardDisposable< VerifyAffinity, Disposable, AllocStatic< Platform >>
     {
         VerifyAffinity( unsigned, Affinity &, Disposable *, impl::ResourceTrace *, unsigned volatile *, bool = false );
 
@@ -763,7 +763,7 @@ namespace {
 
     struct MemoryDumpTask
         : Task
-        , StandardDisposable< MemoryDumpTask >
+        , StandardDisposable< MemoryDumpTask, Disposable, AllocStatic< Platform >>
     {
         static const unsigned intervalSec = 30;  // TODO: make configuration
         static const unsigned intervalSecMin = 5;  // TODO: make configuration
@@ -791,7 +791,7 @@ namespace {
     // multi-threaded base.
     struct AffinityInherentForkBound
         : AffinityInherentBase
-        , StandardDisposable< AffinityInherentForkBound, Disposable, AllocStatic< Platform > >
+        , StandardDisposable< AffinityInherentForkBound, Disposable, AllocStatic< Platform >>
     {
         AffinityInherentForkBound( Affinity &, impl::ResourceSample const &, Affinity & );
 
@@ -814,7 +814,7 @@ namespace {
     // Pair matches are committed to the inner pool as soon as they're discovered.
     struct BinaryPoolThreadBuffer
         : Pool
-        , StandardDisposable< BinaryPoolThreadBuffer, Disposable, AllocTail< BinaryBlock *, Platform > >
+        , StandardDisposable< BinaryPoolThreadBuffer, Disposable, AllocTail< BinaryBlock *, Platform >>
     {
         BinaryPoolThreadBuffer( BinaryPoolMaster * );
         ~BinaryPoolThreadBuffer( void );
@@ -892,7 +892,7 @@ namespace {
     // of local locking.
     //struct VmemPool
     //    : Pool
-    //    , StandardDisposable< VmemPool, Disposable, AllocStatic< Platform > >
+    //    , StandardDisposable< VmemPool, Disposable, AllocStatic< Platform >>
     //{
     //    static size_t const sizeVmemRegion = 65536U;
     //    static size_t const sizeVmemPage = 4096U;
@@ -996,7 +996,7 @@ namespace {
     // a block is commonly freed on a different thread than the one on which it was allocated.
     struct NodePoolSync
         : NodePoolBase
-        , StandardDisposable< NodePoolSync, Disposable, AllocStatic< Platform > >
+        , StandardDisposable< NodePoolSync, Disposable, AllocStatic< Platform >>
     {
         NodePoolSync( Pool &, impl::ResourceSample const &, size_t, size_t, size_t );
 
@@ -1164,7 +1164,7 @@ namespace {
     // memory chunks out of it. Useful, for example, to allocate shared memory into pages or slabs.
     struct MemoryWrapPool
         : Pool
-        , StandardDisposable< MemoryWrapPool >
+        , StandardDisposable< MemoryWrapPool, Disposable, AllocStatic< Platform >>
     {
         MemoryWrapPool( void *, size_t, size_t );
 
@@ -1186,7 +1186,7 @@ namespace {
     // Unbuffered binary pool.  Integrates the mater internally.
     struct BinaryPool
         : Pool
-        , StandardDisposable< BinaryPool, Disposable, AllocStatic< Platform > >
+        , StandardDisposable< BinaryPool, Disposable, AllocStatic< Platform >>
     {
         BinaryPool( Pool &, impl::ResourceSample const & );
 
@@ -1425,7 +1425,7 @@ namespace {
     // A multi-threaded temporal affinity
     struct TemporalAffinity
         : Affinity
-        , StandardDisposable< TemporalAffinity >
+        , StandardDisposable< TemporalAffinity, Disposable, AllocStatic< Platform >>
     {
         struct PoolProxyBase
             : Pool
@@ -1440,7 +1440,7 @@ namespace {
             StandardThreadLocalHandle< ThreadLocalTemporalAffinity > * bound_;
             impl::ResourceSample sample_;
         };
-        typedef std::map< PoolSpec, PoolProxyBase > PoolMap;
+        typedef std::map< PoolSpec, PoolProxyBase, std::less< PoolSpec >, AllocatorAffinity< std::pair< PoolSpec const, PoolProxyBase >, Platform >> PoolMap;
 
         TemporalAffinity( bool, Affinity &, impl::ResourceTrace *, bool );
         ~TemporalAffinity( void );
@@ -1474,7 +1474,7 @@ namespace {
 
     struct ThreadLocalTemporalAffinityFork
         : ThreadLocalTemporalAffinity
-        , StandardDisposable< ThreadLocalTemporalAffinityFork >
+        , StandardDisposable< ThreadLocalTemporalAffinityFork, Disposable, AllocStatic< Platform >>
     {
         explicit ThreadLocalTemporalAffinityFork( Affinity &, impl::ResourceTrace *, bool );
     };
