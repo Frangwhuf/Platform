@@ -135,7 +135,7 @@ void
 StringId::fillInStringId( char const * inStr, sint32 count ) throw()
 {
     if( !inStr ) {
-        data_ = NULL;
+        data_ = nullptr;
         return;
     }
     size_t len;
@@ -182,7 +182,7 @@ StringId::~StringId( void ) throw()
             DestroyRecord( static_cast< RealStringId * >( data_ ) );
         }
     }
-    data_ = NULL;
+    data_ = nullptr;
 }
 
 StringId & StringId::copy( StringId const & c )
@@ -243,7 +243,7 @@ bool tools::IsNullOrEmptyStringId( StringId const & str )
 //   if( count < 0 ) {
 //     len = strlen( str );
 //   } else {
-//     // check that there are no imbeded NULLs
+//     // check that there are no imbeded nullptrs
 //     char const * end = str + count;
 //     char const * c;
 //     for( c=str; c!=end; ++c ) {
@@ -519,7 +519,7 @@ void TestNullAndEmptyStringId( void )
     TOOLS_ASSERTR( IsNullOrEmptyStringId( sid4 ) );
     TOOLS_ASSERTR( sid != sid4 );
     TOOLS_ASSERTR( sid3 == sid4 );
-    StringId sid5( (char const *)NULL );
+    StringId sid5( (char const *)nullptr );
     TOOLS_ASSERTR( !sid5 );
     TOOLS_ASSERTR( IsNullOrEmptyStringId( sid5 ) );
     TOOLS_ASSERTR( sid == sid5 );

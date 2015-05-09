@@ -73,7 +73,7 @@ impl::UnitTestMain( int, char ** )
   {
     // AutoDispose< StringIdIterator > runIter( UnitTestConfig.getAll< StringId >( L"runTest" ) );
     // StringId * sVal;
-    // while( ( sVal = runIter->next() ) != NULL ) {
+    // while( ( sVal = runIter->next() ) != nullptr ) {
     //   patterns.push_back( boost::wregex( sVal->c_str() ) );
     // }
   }

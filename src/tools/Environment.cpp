@@ -24,7 +24,7 @@ namespace {
 
     struct ThreadCycle
     {
-        ThreadCycle( void ) : root_( NULL ) {}
+        ThreadCycle( void ) : root_( nullptr ) {}
 
         CycleTest * volatile root_;
     };
@@ -86,7 +86,7 @@ static StandardThreadLocalHandle< ThreadCycle > cycleRoot_;
 
 CycleTest::CycleTest(
     StringId const & serviceName )
-    : previous_( NULL )
+    : previous_( nullptr )
     , serviceName_( serviceName )
 {
     auto root = cycleRoot_.get();
@@ -150,7 +150,7 @@ Unknown *
 SimpleEnvironment::get( StringId const & svc )
 {
     CycleTest noCycles( svc );
-    Unknown * ret = NULL;
+    Unknown * ret = nullptr;
     auto item=services_.find( svc );
     if( item != services_.end() ) {
         ret = item->second.get();
@@ -158,7 +158,7 @@ SimpleEnvironment::get( StringId const & svc )
         impl::FactoryEnvironment * factory = registryFetch< impl::FactoryEnvironment >( svc );
         if( !factory ) {
             TOOLS_ASSERT( !"Unknown service" );
-            return NULL;
+            return nullptr;
         }
         //impl::FactoryEnvironment::Desc const & desc = factory->describe();
         AutoDispose< Service > service( factory->factory( *this ));
@@ -218,7 +218,7 @@ TwoStageEnvironment::get( StringId const & svc )
   if( ServiceName< impl::Service >() == svc ) {
       return static_cast< Unknown * >( this );
   }
-  Unknown * ret = NULL;
+  Unknown * ret = nullptr;
   auto item=services_.find( svc );
   if( item != services_.end() ) {
     ret = item->second.get();
@@ -226,7 +226,7 @@ TwoStageEnvironment::get( StringId const & svc )
       impl::FactoryEnvironment * factory = registryFetch< impl::FactoryEnvironment >( svc );
       if( !factory ) {
           TOOLS_ASSERT( !"Unknown service" );
-          return NULL;
+          return nullptr;
       }
       //impl::FactoryEnvironment::Desc const & desc = factory->describe();
       AutoDispose< tools::Service > service( factory->factory( *this ));
@@ -258,7 +258,7 @@ TwoStageEnvironment::start( void ) throw()
 {
   // TODO: implement this
   TOOLS_ASSERT( !"Not implemented" );
-  return static_cast< Request * >( NULL );
+  return static_cast< Request * >( nullptr );
 }
 
 AutoDispose< Request >
@@ -266,7 +266,7 @@ TwoStageEnvironment::stop( void ) throw()
 {
   // TODO: implement this
   TOOLS_ASSERT( !"Not implemented" );
-  return static_cast< Request * >( NULL );
+  return static_cast< Request * >( nullptr );
 }
 
 namespace tools {
@@ -371,14 +371,14 @@ AutoDispose< Request >
 EnvTestImpl::serviceStart( void )
 {
     started_ = true;
-    return static_cast< Request * >( NULL );
+    return static_cast< Request * >( nullptr );
 }
 
 AutoDispose< Request >
 EnvTestImpl::serviceStop( void )
 {
     stopped_ = true;
-    return static_cast< Request * >( NULL );
+    return static_cast< Request * >( nullptr );
 }
 
 bool

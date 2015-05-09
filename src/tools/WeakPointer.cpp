@@ -28,7 +28,7 @@ namespace {
 
     struct PhantomSequenceRef
     {
-        PhantomSequence * current_;  // List head (NULL at refs == 0)
+        PhantomSequence * current_;  // List head (nullptr at refs == 0)
         uint32 next_;  // Next sequence
         uint16 refs_;  // Count of live threads
         bool live_;  // Accept inserts only if live and no derefs.
@@ -163,7 +163,7 @@ tools::definePhantomPrototype( PhantomRealTime *** )
 //////////////////
 
 PhantomSequence::PhantomSequence( void )
-    : first_( NULL )
+    : first_( nullptr )
 {
 }
 
@@ -183,7 +183,7 @@ PhantomSequence::deref(
     PhantomSequence * next = this;
     while( PhantomSequence * seq = next ) {
         TOOLS_ASSERT( atomicRead( &seq->refs_ ) > 0U );
-        next = ( seq->sequence_ != final ) ? seq->next_ : NULL;
+        next = ( seq->sequence_ != final ) ? seq->next_ : nullptr;
         if( !atomicDeref( &seq->refs_ )) {
             delete seq;
         }
@@ -198,7 +198,7 @@ PhantomSequence::deref(
     PhantomSequence * next = this;
     while( PhantomSequence * seq = next ) {
         TOOLS_ASSERT( atomicRead( &seq->refs_ ) > 0U );
-        next = ( seq->sequence_ != final ) ? seq->next_ : NULL;
+        next = ( seq->sequence_ != final ) ? seq->next_ : nullptr;
         if( !atomicDeref( &seq->refs_ )) {
             atomicPush( requeue, seq, &PhantomSequence::next_ );
         }
@@ -213,7 +213,7 @@ PhantomSequenceLocal::PhantomSequenceLocal(
     PhantomSequenceRoot & root )
     : root_( &root )
     , entries_( 0U )
-    , stash_( NULL )
+    , stash_( nullptr )
 {
 }
 
@@ -242,7 +242,7 @@ PhantomSequenceLocal::derefLocal(
         derefLocalMain( uncloakSeq, start );
     }
     if( !!root_->marshalled_ ) {
-        PhantomSequence * next = atomicExchange( &root_->marshalled_, static_cast< PhantomSequence * >( NULL ));
+        PhantomSequence * next = atomicExchange( &root_->marshalled_, static_cast< PhantomSequence * >( nullptr ));
         while( PhantomSequence * demarshal = next ) {
             next = demarshal->next_;
             TOOLS_ASSERT( atomicRead( &demarshal->refs_ ) == 0U );
@@ -279,7 +279,7 @@ PhantomSequenceLocal::exit(
 {
     PhantomSequence * start;
     atomicTryUpdate( &root_->root_, [=, &start]( PhantomSequenceRef * ref )->bool {
-        start = ( ref->next_ != cloakSeq_ ) ? ref->current_ : NULL;
+        start = ( ref->next_ != cloakSeq_ ) ? ref->current_ : nullptr;
         ref->live_ = false;
         TOOLS_ASSERT( ref->refs_ > 0U );
         --ref->refs_;
@@ -306,7 +306,7 @@ PhantomSequenceLocal::touch(
         recloakSeq = ref->next_;
         TOOLS_ASSERT( ref->refs_ > 0U );
         if( recloakSeq == cloakSeq_ ) {
-            start = NULL;
+            start = nullptr;
             if( !ref->live_ ) {
                 // no change
                 return false;
@@ -358,7 +358,7 @@ PhantomSequenceLocal::post(
     });
     if( seqPost == stash_ ) {
         // Just used our stash
-        stash_ = NULL;
+        stash_ = nullptr;
     }
     atomicPush( &seqPost->first_, weakling.release(), &Weakling::weaklingNext_ );
 }
@@ -542,10 +542,10 @@ void TestPhantomMapUpdateInsert( void )
         AutoDispose<> cload( phantomTryBindPrototype< PhantomUniversal >() );
         uint64 key = ( 2 * i ) + 1;
         phMap.find( key, [&]( TestPhantomElement const * ref )->void {
-            TOOLS_ASSERTR( ref == NULL );
+            TOOLS_ASSERTR( ref == nullptr );
         });
         phMap.update( key, [&]( TestPhantomElement *& ref )->void {
-            TOOLS_ASSERTR( ref == NULL );
+            TOOLS_ASSERTR( ref == nullptr );
             ref = new TestPhantomElement( key );
         });
         ++i;
@@ -555,10 +555,10 @@ void TestPhantomMapUpdateInsert( void )
         AutoDispose<> cload( phantomTryBindPrototype< PhantomUniversal >() );
         uint64 key = 2 * i;
         phMap.find( key, [&]( TestPhantomElement const * ref )->void {
-            TOOLS_ASSERTR( ref == NULL );
+            TOOLS_ASSERTR( ref == nullptr );
         });
         phMap.update( key, [&]( TestPhantomElement *& ref )->void {
-            TOOLS_ASSERTR( ref == NULL );
+            TOOLS_ASSERTR( ref == nullptr );
             ref = new TestPhantomElement( key );
         });
         ++i;
@@ -588,10 +588,10 @@ void TestPhantomMapUpdateInsertDup( void )
         AutoDispose<> cload( phantomTryBindPrototype< PhantomUniversal >() );
         uint64 key = i;
         phMap.find( key, [&]( TestPhantomElement const * ref )->void {
-            TOOLS_ASSERTR( ref == NULL );
+            TOOLS_ASSERTR( ref == nullptr );
         });
         phMap.update( key, [&]( TestPhantomElement *& ref )->void {
-            TOOLS_ASSERTR( ref == NULL );
+            TOOLS_ASSERTR( ref == nullptr );
             ref = new TestPhantomElement( key );
         });
         ++i;
@@ -602,10 +602,10 @@ void TestPhantomMapUpdateInsertDup( void )
         AutoDispose<> cload( phantomTryBindPrototype< PhantomUniversal >() );
         uint64 key = i;
         phMap.find( key, [&]( TestPhantomElement const * ref )->void {
-            TOOLS_ASSERTR( ref != NULL );
+            TOOLS_ASSERTR( ref != nullptr );
         });
         phMap.update( key, [&]( TestPhantomElement *& ref )->void {
-            TOOLS_ASSERTR( ref != NULL );
+            TOOLS_ASSERTR( ref != nullptr );
             ref = new TestPhantomElement( key );
         });
         ++i;
@@ -634,10 +634,10 @@ void TestPhantomMapUpdateRemove( void )
         AutoDispose<> cload( phantomTryBindPrototype< PhantomUniversal >() );
         uint64 key = i;
         phMap.find( key, [&]( TestPhantomElement const * ref )->void {
-            TOOLS_ASSERTR( ref == NULL );
+            TOOLS_ASSERTR( ref == nullptr );
         });
         phMap.update( key, [&]( TestPhantomElement *& ref )->void {
-            TOOLS_ASSERTR( ref == NULL );
+            TOOLS_ASSERTR( ref == nullptr );
             ref = new TestPhantomElement( key );
         });
         ++i;
@@ -650,7 +650,7 @@ void TestPhantomMapUpdateRemove( void )
         while( i < 6 ) {
             uint64 key = i * 2;
             phMap.update( key, [&]( TestPhantomElement *& ref )->void {
-                ref = NULL;
+                ref = nullptr;
             });
             ++i;
         }

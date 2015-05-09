@@ -489,7 +489,7 @@ namespace tools {
                 // Useful name for memory tracking
                 tools::StringId name = tools::nameOf< ElementPool< ElementT, AffinityT >>();
                 tools::Pool * ret = &aff.pool( std::max( sizeof( size_t ), sizeof( ElementT )), impl::ResourceSample( sizeof( ElementT ), name ));
-                tools::atomicCas< tools::Pool *, tools::Pool * >( storage(), NULL, ret );
+                tools::atomicCas< tools::Pool *, tools::Pool * >( storage(), nullptr, ret );
                 return **storage();
             }
             TOOLS_NO_INLINE static void *
@@ -667,7 +667,7 @@ namespace tools {
         typename std::allocator< ElementT >::pointer
         allocate(
             typename std::allocator< ElementT >::size_type count,
-            void const * = NULL )
+            void const * = nullptr )
         {
             TOOLS_ASSERT( count != 0 );
             if( count == 1U ) {
@@ -816,13 +816,13 @@ namespace tools {
         struct CyclicSlabBase
         {
             CyclicSlabBase( void )
-                : singleton_( NULL )
-                , slabReturns_( NULL )
+                : singleton_( nullptr )
+                , slabReturns_( nullptr )
             {}
 
             // If I replace a singleton, it is stored here until it is released, then never used again.
             void * singleton_;
-            // Where slabs are freed, they end here. The terminator for this list isn't quite NULL, it's a
+            // Where slabs are freed, they end here. The terminator for this list isn't quite nullptr, it's a
             // token indicating the actual size.
             CyclicSlab * slabReturns_;
         };
@@ -896,7 +896,7 @@ namespace tools {
         typedef tools::detail::CyclicPoolDesc CyclicPoolDesc;
 
         AllocCyclicRoot( void ) {
-            head_.reset( static_cast< void * >( NULL ));
+            head_.reset( static_cast< void * >( nullptr ));
             name();
         }
         ~AllocCyclicRoot( void ) {
@@ -1009,7 +1009,7 @@ namespace tools {
         AllocatorCyclic( AllocatorThisT const & c )
             : BaseT( c )
         {
-            c.head_.reset( static_cast< void * >( NULL ));
+            c.head_.reset( static_cast< void * >( nullptr ));
             name();
         }
         // Don'treally have any other parameters
@@ -1045,7 +1045,7 @@ namespace tools {
         // select_on_container_copy_construction. Neat, eh?
         AllocatorThisT & operator=( AllocatorThisT & c ) {
             head_ = c.head_;
-            c.head_.reset( static_cast< void * >( NULL ));
+            c.head_.reset( static_cast< void * >( nullptr ));
             return *this;
         }
 
@@ -1060,7 +1060,7 @@ namespace tools {
                 }
                 if( CyclicSlabRoot * h = head_.other() ) {
                     // Make sure we are only here because the allocation failed.
-                    TOOLS_ASSERT( !h->next_->tryMap( NULL ));  // assertion side effects are probably already here.
+                    TOOLS_ASSERT( !h->next_->tryMap( nullptr ));  // assertion side effects are probably already here.
                 }
                 // Go to the even more complex path. This is here because it is less likely than the startup.
                 return static_cast< typename std::allocator< ElementT >::pointer >( tools::detail::cyclicSlabPoolMap( &head_, *tools::registryFetch< tools::detail::CyclicPoolDesc, ElementT >(), name_ ));
@@ -1070,7 +1070,7 @@ namespace tools {
         }
 
         // Regular
-        typename std::allocator< ElementT >::pointer allocate( typename std::allocator< ElementT >::size_type count, void const * hint = NULL ) {
+        typename std::allocator< ElementT >::pointer allocate( typename std::allocator< ElementT >::size_type count, void const * hint = nullptr ) {
             CyclicSlabRoot * h;
             // for node allocators, this should be statically determined and instanced.
             if( ( sizeof( ElementT ) < tools::detail::CyclicPoolDesc::cyclicBytesMax ) && ( count == 1U ) && head_.as( &h )) {
@@ -1100,13 +1100,13 @@ namespace tools {
                         tools::detail::cyclicSlabPoolUnmap( ptr, ptrSlab, h, slabPools() );
                         return;
                     } else {
-                        h->singleton_ = NULL;
+                        h->singleton_ = nullptr;
                     }
                 } else {
                     // The only way we should be here is because we are releasing the lone singleton. Reset
                     // that singleton and fall through.
                     TOOLS_ASSERT( head_.default() == site );
-                    head_ = static_cast< void * >( NULL );
+                    head_ = static_cast< void * >( nullptr );
                 }
             }
             // Not a node-sized deallocation. Use our base AllocatorAffinity<>.

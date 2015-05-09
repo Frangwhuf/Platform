@@ -34,7 +34,7 @@ namespace tools {
 
     // Compute the name of a service
     template< typename ServiceT >
-    inline StringId const & ServiceName( ServiceT *** = NULL ) {
+    inline StringId const & ServiceName( ServiceT *** = nullptr ) {
         // ADL implements service name
         return nameOf< ServiceT >();
     }
@@ -68,15 +68,15 @@ namespace tools {
         virtual Unknown * get( StringId const & ) = 0;
 
         template< typename ServiceT >
-        typename tools::ServiceInterfaceOf< ServiceT >::Type * get( ServiceT *** = NULL ) {
+        typename tools::ServiceInterfaceOf< ServiceT >::Type * get( ServiceT *** = nullptr ) {
             Unknown * ret = get( tools::ServiceName< ServiceT >() );
-            return !!ret ? ret->getInterface< typename tools::ServiceInterfaceOf< ServiceT >::Type >() : NULL;
+            return !!ret ? ret->getInterface< typename tools::ServiceInterfaceOf< ServiceT >::Type >() : nullptr;
         }
 
         template< typename ServiceT, typename ItfT >
-        ItfT * get( ServiceT *** = NULL, ItfT *** = NULL ) {
+        ItfT * get( ServiceT *** = nullptr, ItfT *** = nullptr ) {
             Unknown * ret = get( tools::ServiceName< ServiceT >() );
-            return !!ret ? ret->getInterface< ItfT >() : NULL;
+            return !!ret ? ret->getInterface< ItfT >() : nullptr;
         }
     };
 
@@ -112,16 +112,16 @@ namespace tools {
         static_assert( std::is_same< tools::Service, ItfT >::value || std::is_base_of< tools::Service, ItfT >::value, "ItfT must derive from tools::Service" );
 
         StandardService( void )
-            : serviceThreadScheduler_( NULL )
+            : serviceThreadScheduler_( nullptr )
         {
         }
 
         // These should be implemented optionall by the implementation type.
         AutoDispose< Request > serviceStart( void ) {
-            return NULL;
+            return nullptr;
         }
         AutoDispose< Request > serviceStop( void ) {
-            return NULL;
+            return nullptr;
         }
     private:
         struct StartRequest
@@ -193,10 +193,10 @@ namespace tools {
 
             // These should be implemented optionall by the implementation type.
             AutoDispose< Request > serviceStart( void ) {
-                return NULL;
+                return nullptr;
             }
             AutoDispose< Request > serviceStop( void ) {
-                return NULL;
+                return nullptr;
             }
         private:
             struct StartRequest

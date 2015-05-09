@@ -1070,7 +1070,7 @@ namespace tools {
 //#elif defined(__GNUC__)
 //                    return ::tools::impl::AtomicTrait< 0 >::template GenericAdd< TypeT, Storage >::op( site, diff );
 //#endif // WINDOWS_PLATFORM
-                    return static_cast< TypeT * const >( NULL );
+                    return static_cast< TypeT * const >( nullptr );
                 }
             };
 //#endif // 32-bit pointers
@@ -1110,7 +1110,7 @@ namespace tools {
 //#elif defined(__GNUC__)
 //                    return ::tools::impl::AtomicTrait< 0 >::template GenericSubtract< TypeT, Storage >::op( site, diff );
 //#endif // WINDOWS_PLATFORM
-                    return static_cast< TypeT * const >( NULL );
+                    return static_cast< TypeT * const >( nullptr );
                 }
             };
 //#endif // 32-bit pointers
@@ -1222,7 +1222,7 @@ namespace tools {
 //#elif defined(__GNUC__)
 //                    return ::tools::impl::AtomicTrait< 0 >::template GenericAnd< TypeT, Storage >::op( site, mask );
 //#endif // WINDOWS_PLATFORM
-                    return static_cast< TypeT * const >( NULL );
+                    return static_cast< TypeT * const >( nullptr );
                 }
             };
 //#endif // 32-bit pointers
@@ -1262,7 +1262,7 @@ namespace tools {
 //#elif defined(__GNUC__)
 //                    return ::tools::impl::AtomicTrait< 0 >::template GenericOr< TypeT, Storage >::op( site, mask );
 //#endif // WINDOWS_PLATFORM
-                    return static_cast< TypeT * const >( NULL );
+                    return static_cast< TypeT * const >( nullptr );
                 }
             };
 //#endif // 32-bit pointers
@@ -1520,7 +1520,7 @@ namespace tools {
 //#elif defined(__GNUC__)
 //                    return ::tools::impl::AtomicTrait< 0 >::template GenericAdd< TypeT, Storage >::op( site, diff );
 //#endif // WINDOWS_PLATFORM
-                    return static_cast< TypeT * const >( NULL );
+                    return static_cast< TypeT * const >( nullptr );
                 }
             };
 //#endif // 64-bit pointers
@@ -1560,7 +1560,7 @@ namespace tools {
 //#elif defined(__GNUC__)
 //                    return ::tools::impl::AtomicTrait< 0 >::template GenericSubtract< TypeT, Storage >::op( site, diff );
 //#endif // WINDOWS_PLATFORM
-                    return static_cast< TypeT * const >( NULL );
+                    return static_cast< TypeT * const >( nullptr );
                 }
             };
 //#endif // 64-bit pointers
@@ -1672,7 +1672,7 @@ namespace tools {
 //#elif defined(__GNUC__)
 //                    return ::tools::impl::AtomicTrait< 0 >::template GenericAnd< TypeT, Storage >::op( site, mask );
 //#endif // WINDOWS_PLATFORM
-                    return static_cast< TypeT * const >( NULL );
+                    return static_cast< TypeT * const >( nullptr );
                 }
             };
 //#endif // 64-bit pointers
@@ -1712,7 +1712,7 @@ namespace tools {
 //#elif defined(__GNUC__)
 //                    return ::tools::impl::AtomicTrait< 0 >::template GenericOr< TypeT, Storage >::op( site, mask );
 //#endif // WINDOWS_PLATFORM
-                    return static_cast< TypeT * const >( NULL );
+                    return static_cast< TypeT * const >( nullptr );
                 }
             };
 //#endif // 64-bit pointers
@@ -2140,7 +2140,7 @@ TOOLS_WARNINGS_RESTORE
     struct atomicPointer
     {
         atomicPointer( void )
-            : pointer_( NULL )
+            : pointer_( nullptr )
         {}
         ~atomicPointer( void )
         {
@@ -2164,7 +2164,7 @@ TOOLS_WARNINGS_RESTORE
         ItemT *
         compareAndSwap(
             ItemT * oldValue,
-            ItemT * newValue = NULL )
+            ItemT * newValue = nullptr )
         {
             return tools::atomicCas( &pointer_, oldValue, newValue );
         }
@@ -2495,7 +2495,7 @@ TOOLS_WARNINGS_RESTORE
 
         // Enter the excusion/lock.  This returns a Disposable that will exit
         // the exclusion/lock when disposed.  If tryOnly is true, enter may
-        // return NULL if the thread cannot immediately enter the exclusion/lock.
+        // return nullptr if the thread cannot immediately enter the exclusion/lock.
         virtual AutoDispose<> enter( impl::ResourceSample const &, bool tryOnly = false ) = 0;
 
         // Check if this monitor is aquired by the current thread. This may not be implemented by all
