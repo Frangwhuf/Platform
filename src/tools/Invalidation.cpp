@@ -149,7 +149,7 @@ SubscrItem::SubscrItem( PubBase * p, Thunk const & t, Thunk const & d, unsigned 
     , thunk_( t )
     , dead_( d )
     , flags_( f )
-    , next_( NULL )
+    , next_( nullptr )
 {
 }
 
@@ -163,7 +163,7 @@ SubscrItem::~SubscrItem( void )
 //////////
 
 PubBase::PubBase( void )
-	: head_( NULL )
+	: head_( nullptr )
 	, capacity_( 0U )
 	, size_( 0U )
     , dead_( 0U )
@@ -175,7 +175,7 @@ PubBase::~PubBase( void )
     prune();
 	TOOLS_ASSERT( size_ == 0U );
 	SubscrItem * current = head_;
-	while( current != NULL ) {
+	while( current != nullptr ) {
 		SubscrItem * next = current->next_;
 		delete current;
 		current = next;
@@ -187,9 +187,9 @@ PubBase::newSubscription( Thunk const & thunk, Thunk const & dead )
 {
 	if( !thunk ) {
 		// no one to tell, so don't bother
-		return static_cast< Disposable * >( NULL );
+		return static_cast< Disposable * >( nullptr );
 	}
-	SubItemDisp * ret = NULL;
+	SubItemDisp * ret = nullptr;
 	while( true ) {
 		if( size_ == capacity_ ) {
 			// all nodes in use, make a new one
@@ -206,7 +206,7 @@ PubBase::newSubscription( Thunk const & thunk, Thunk const & dead )
 		}
 		// try to find one to use
 		SubscrItem * volatile current = head_;
-		while( current != NULL ) {
+		while( current != nullptr ) {
 			unsigned flags = atomicRead( &current->flags_ );
 			if( flags == 0U ) {
 				// Disposed but not being called, perfect
@@ -232,14 +232,14 @@ PubBase::newSubscription( Thunk const & thunk, Thunk const & dead )
 			break;
 		}
 	}
-	return ret;
+	return std::move(ret);
 }
 
 void
 PubBase::invalidate( void )
 {
 	SubscrItem * volatile current = head_;
-	while( current != NULL ) {
+	while( current != nullptr ) {
         unsigned oldFlags, newFlags;
         oldFlags = atomicRead( &current->flags_ );
         bool done = false;
@@ -279,7 +279,7 @@ void
 PubBase::prune( void )
 {
     SubscrItem * volatile current = head_;
-    while( current != NULL ) {
+    while( current != nullptr ) {
         if( dead_ == 0 ) {
             return;
         }

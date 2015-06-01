@@ -97,14 +97,14 @@ PosixTimerThread::PosixTimerThread( void )
     , wake_( false )
     , queue_( impl::timerQueueNew( toThunk< &PosixTimerThread::notifyWake >() ))
 {
-    pthread_mutex_init( &waitLock_, NULL );
+    pthread_mutex_init( &waitLock_, nullptr );
     pthread_condattr_t attr;
     pthread_condattr_init( &attr );
     auto ret = pthread_condattr_setclock( &attr, CLOCK_MONOTONIC );
     TOOLS_ASSERTR(ret == 0);
     pthread_cond_init( &waitCond_, &attr );
     pthread_condattr_destroy( &attr );
-    pthread_create( &thread_, NULL, &PosixTimerThread::threadEntry, this );
+    pthread_create( &thread_, nullptr, &PosixTimerThread::threadEntry, this );
 }
 
 PosixTimerThread::~PosixTimerThread( void )
@@ -117,7 +117,7 @@ PosixTimerThread::~PosixTimerThread( void )
     pthread_cond_signal( &waitCond_ );
     void * status;
     pthread_join( thread_, &status );
-    TOOLS_ASSERT( status == NULL );
+    TOOLS_ASSERT( status == nullptr );
 }
 
 void
@@ -164,7 +164,7 @@ void *PosixTimerThread::threadEntry(
         // TODO: log this error
     }
     static_cast< PosixTimerThread * >( self )->entry();
-    return NULL;
+    return nullptr;
 }
 
 /////////////
@@ -180,14 +180,14 @@ AutoDispose< Request >
 TimingImpl::serviceStart( void )
 {
     ptimer_ = new PosixTimerThread;
-    return static_cast< Request * >( NULL );
+    return static_cast< Request * >( nullptr );
 }
 
 AutoDispose< Request >
 TimingImpl::serviceStop( void )
 {
     ptimer_.reset();
-    return static_cast< Request * >( NULL );
+    return static_cast< Request * >( nullptr );
 }
 
 uint64

@@ -89,7 +89,7 @@ namespace tools {
             , tools::Task
         {
             RequestReactorCore( void )
-                : waitReq_( NULL )
+                : waitReq_( nullptr )
             {
             }
 
@@ -132,7 +132,7 @@ namespace tools {
             {
                 TOOLS_ASSERT( !!nextError_ );
                 TOOLS_ASSERT( !nextStep_ );
-                waitReq_ = NULL;
+                waitReq_ = nullptr;
                 if( !!err ) {
                     // Mix in some more debugging information in the error
                     //err = tools::errorInfoSymbol( err, nextError_, "continuation function" );
@@ -157,7 +157,7 @@ namespace tools {
             {
                 TOOLS_ASSERT( !!nextThunk_ );
                 TOOLS_ASSERT( !nextStep_ );
-                waitReq_ = NULL;
+                waitReq_ = nullptr;
                 if( !!err ) {
                     //finishError_ = std::move( tools::errorChainInfo( err, waitInfo_ ));
                     //finishError_ = std::move( tools::errorInfoSymbol( finishError_, nextThunk_, "continuation function" ));
@@ -309,7 +309,7 @@ loop:
         void
         finish( void )
         {
-            finish( NULL );
+            finish( nullptr );
         }
         void
         waitFinish(
@@ -371,7 +371,7 @@ loop:
                 TOOLS_ASSERT( !completion_ );
                 TOOLS_ASSERT( !!complete );
                 // TODO: assert that there are no locks held
-                // Nothing else to do, as the completion is alread on the stack.
+                // Nothing else to do, as the completion is already on the stack.
             }
 
             // Save the real completion on the stack
@@ -434,6 +434,7 @@ loop:
             // Callback types we support
             typedef RequestStep ( ImplementationT::* WaitFunc )( Error * );
             typedef RequestStep ( ImplementationT::* ContFunc )( void );
+            typedef void (ImplementationT::* SuspendFunc)();
 
             // Be terse on name length for debug symbols
             template< WaitFunc waiter >
@@ -454,7 +455,7 @@ loop:
                         // Save things
                         this_->doComplete( &local, false );
                         Error * moreLocalOpt = localOpt;
-                        localOpt = NULL;
+                        localOpt = nullptr;
                         this_->eval( runWaitF( static_cast< ImplementationT * __restrict >( this_ ), moreLocalOpt ), &local, &localOpt );
                     }
                     // On to the next step!
@@ -510,12 +511,12 @@ loop:
                 TOOLS_ASSERT( !!opt );
                 // TODO: add context to the error to note the path it traveled through.
                 // opt = errInfoAppend( opt, context );
-                Continuation local;
+                Completion local;
                 // Capture the originals
                 doComplete( &local, true );
 #ifdef TOOLS_DEBUG
                 TOOLS_ASSERT( completion_.func_ == local.func_ );
-                completion_.func_ = NULL;
+                completion_.func_ = nullptr;
 #endif // TOOLS_DEBUG
                 local.param_ = completion_.param_;
                 // Time to act
@@ -534,9 +535,17 @@ loop:
                 ThisRequestBaseT * __restrict this_ = static_cast< ThisRequestBaseT * >( param );
                 Completion local = this_->completion_;
 #ifdef TOOLS_DEBUG
-                this_->completion_.param_ = NULL;
+                this_->completion_.param_ = nullptr;
 #endif // TOOLS_DEBUG
                 static_cast< Request * >( static_cast< void * >( opt ))->start( local );
+            }
+
+            template< SuspendFunc suspender >
+            static void suspend( void * param, Error * )
+            {
+                ThisRequestBaseT * __restrict this_ = static_cast< ThisRequestBaseT * >(param);
+                // TODO: assert that we aren't already suspended
+                (static_cast<ImplementationT * __restrict>(this_)->*suspender)();
             }
 
             // This is for cleaning up the Error after it is reported to the user.
@@ -548,7 +557,7 @@ loop:
                 // opt = this_->errInfoAppend( opt, StringIdNull() );
                 Completion local = this_->completion_;
 #ifdef TOOLS_DEBUG
-                this_->completion_.param_ = NULL;
+                this_->completion_.param_ = nullptr;
 #endif // TOOLS_DEBUG
                 AutoDispose< Error > localOpt( opt );
                 local.fire( localOpt.get() );
@@ -569,21 +578,26 @@ loop:
     {
         typedef typename tools::detail::RequestBase_< ImplementationT >::ContFunc ContFunc;
         typedef typename tools::detail::RequestBase_< ImplementationT >::WaitFunc WaitFunc;
+        typedef typename tools::detail::RequestBase_< ImplementationT >::SuspendFunc SuspendFunc;
         typedef typename tools::detail::RequestBase_< ImplementationT >::ThisRequestBaseT ThisRequestBaseT;
 
         template< ContFunc cc > struct ContParam {};
         template< WaitFunc cc > struct WaitParam {};
+        template< SuspendFunc cc > struct SuspendParam {};
 
         RequestStep waitFinish( Request & req )
         {
+            TOOLS_ASSERT(!ThisRequestBaseT::completion_);
             ThisRequestBaseT::completion_ = Completion( &ThisRequestBaseT::waitFinishStart, static_cast< void * >( &req ));
             return RequestStepWait;
         }
 
-        RequestStep maybeWaitFinish( Request * req )
+        template<typename RequestContainerT>
+        RequestStep maybeWaitFinish(RequestContainerT const & req)
         {
-            if( !!req ) {
-                return waitFinish( *req );
+            static_assert(std::is_base_of<tools::Request, typename std::decay<decltype(*req)>::type>::value, "RequestContainterT must dereference to a type derived from req");
+            if (!!req) {
+                return waitFinish(*req);
             }
             return finish();
         }
@@ -592,12 +606,14 @@ loop:
 
         RequestStep finish( Error & e )
         {
+            TOOLS_ASSERT(!ThisRequestBaseT::completion_);
             ThisRequestBaseT::completion_ = Completion( &ThisRequestBaseT::notifyError, static_cast< void * >( e.ref().get() ));
             return RequestStepFinishError;
         }
 
         RequestStep finish( tools::AutoDispose< Error::Reference > && e )
         {
+            TOOLS_ASSERT(!ThisRequestBaseT::completion_);
             ThisRequestBaseT::completion_ = Completion( &ThisRequestBaseT::notifyError, static_cast< void * >( e.release() ));
             return RequestStepFinishError;
         }
@@ -605,20 +621,23 @@ loop:
         template< ContFunc conter >
         RequestStep cont( ContParam< conter > *** = 0 )
         {
-            ThisRequestBaseT::completion_ = Completion( &ThisRequestBaseT::template cCont< conter >::f, NULL );
+            TOOLS_ASSERT(!ThisRequestBaseT::completion_);
+            ThisRequestBaseT::completion_ = Completion( &ThisRequestBaseT::template cCont< conter >::f, nullptr );
             return RequestStepContinue;
         }
 
         template< WaitFunc waiter >
         RequestStep cont( WaitParam< waiter > *** = 0 )
         {
-            ThisRequestBaseT::completion_ = Completion( &ThisRequestBaseT::template cWait< waiter >::f, NULL );
+            TOOLS_ASSERT(!ThisRequestBaseT::completion_);
+            ThisRequestBaseT::completion_ = Completion( &ThisRequestBaseT::template cWait< waiter >::f, nullptr );
             return RequestStepContinue;
         }
 
         template< ContFunc conter >
         RequestStep wait( Request & req, ContParam< conter > *** = 0 )
         {
+            TOOLS_ASSERT(!ThisRequestBaseT::completion_);
             ThisRequestBaseT::completion_ = Completion( &ThisRequestBaseT::template cCont< conter >::startF, static_cast< void * >( &req ));
             return RequestStepWait;
         }
@@ -626,26 +645,79 @@ loop:
         template< WaitFunc waiter >
         RequestStep wait( Request & req, WaitParam< waiter > *** = 0 )
         {
+            TOOLS_ASSERT(!ThisRequestBaseT::completion_);
             ThisRequestBaseT::completion_ = Completion( &ThisRequestBaseT::template cWait< waiter >::startF, static_cast< void * >( &req ));
             return RequestStepWait;
         }
 
-        template< ContFunc conter >
-        RequestStep maybeWait( Request * req, ContParam< conter > *** = 0 )
+        template< ContFunc conter, typename RequestContainerT >
+        RequestStep maybeWait( RequestContainerT const & req, ContParam< conter > *** = 0 )
         {
+            static_assert(std::is_base_of<tools::Request, typename std::decay<decltype(*req)>::type>::value, "RequestContainerT must dereference to a type derived from Request");
             if( !!req ) {
                 return wait< conter >( *req );
             }
             return cont< conter >();
         }
 
-        template< WaitFunc waiter >
-        RequestStep maybeWait( Request * req, WaitParam< waiter > *** = 0 )
+        template< WaitFunc waiter, typename RequestContainerT >
+        RequestStep maybeWait( RequestContainerT const & req, WaitParam< waiter > *** = 0 )
         {
+            static_assert(std::is_base_of<tools::Request, typename std::decay<decltype(*req)>::type>::value, "RequestContainerT must dereference to a type derived from Request");
             if( !!req ) {
                 return wait< waiter >( *req );
             }
             return cont< waiter >();
+        }
+
+        // Exit the reactor and call the suspend function. this function should arrange for the request to be
+        // resumed. Be warned, it is _always_ a (bad) race condition to have an empty suspend function.
+        template< SuspendFunc suspender >
+        RequestStep suspend( SuspendParam< suspender > *** = 0 )
+        {
+            TOOLS_ASSERT(!ThisRequestBaseT::completion_);
+            ThisRequestBaseT::completion_ = Completion( &ThisRequestBaseT::template suspend< suspender >, nullptr );
+            return RequestStepWait;
+        }
+
+        // Resume a suspended reactor, returning into the implementation at conter/waiter. This will function as though
+        // a virtual inner request had notified (with an optional Error).
+        template< ContFunc conter >
+        void resume( Error * e = nullptr, ContParam< conter > *** = 0 )
+        {
+            // TODO: assert that we are suspended
+            ThisRequestBaseT::template cCont< conter >::f(static_cast<void *>(static_cast<ThisRequestBaseT *>(this)), e);
+        }
+
+        template< ContFunc conter >
+        void resume( tools::AutoDispose< Error::Reference > && e, ContParam< conter > *** = 0 )
+        {
+            // TODO: assert that we are suspended
+            ThisRequestBaseT::template cCont< conter >::f(static_cast<void *>(static_cast<ThisRequestBaseT *>(this)), e.release());
+        }
+
+        template< WaitFunc waiter >
+        void resume( Error * e = nullptr, WaitParam< waiter > *** = 0 )
+        {
+            // TODO: assert that we are suspended
+            ThisRequestBaseT::template cWait< waiter >::f(static_cast<void *>(static_cast<ThisRequestBaseT *>(this)), e);
+        }
+
+        template< WaitFunc waiter >
+        void resume( tools::AutoDispose< Error::Reference > && e = nullptr, WaitParam< waiter > *** = 0 )
+        {
+            // TODO: assert that we are suspended
+            ThisRequestBaseT::template cWait< waiter >::f(static_cast<void *>(static_cast<ThisRequestBaseT *>(this)), e.release());
+        }
+
+        void resumeFinish(Error * e = nullptr)
+        {
+            // TODO: assert that we are suspended
+            Completion local = ThisRequestBaseT::completion_;
+#ifdef TOOLS_DEBUG
+            ThisRequestBaseT::completion_.param_ = nullptr;
+#endif // TOOLS_DEBUG
+            local.fire(e);
         }
 
         Error * requestErrorInfo( Error * err )
@@ -662,12 +734,12 @@ loop:
         }
 
         // Request
-        void start( Completion const & notify )
+        void start( Completion const & notify ) override
         {
             // Preserve stack variables for debugability.
             Completion local = notify;
             ThisRequestBaseT::doStart( local );
-            Error * opt = NULL;
+            Error * opt = nullptr;
             ThisRequestBaseT::eval( runRequestStart(), &local, &opt );
             // All set, do something
             local.fire( opt );
@@ -791,14 +863,14 @@ loop:
         void reset( ContParam< conter > *** = 0 )
         {
             stepable_.next_ = conter;
-            stepable_.wait_ = NULL;
+            stepable_.wait_ = nullptr;
         }
 
         // This is called at start of next().  The implementation can override this to permit some streams
         // to detect when they are seeking.
         ContFunc streamReset( void )
         {
-            return NULL;
+            return nullptr;
         }
 
         // The following can be useful in streams where the producer is asynchronous to the consumer.
@@ -821,11 +893,11 @@ loop:
         }
 
         template< ContFunc conter >
-        void finish( Error * err = NULL, ContParam< conter > *** = 0 )
+        void finish( Error * err = nullptr, ContParam< conter > *** = 0 )
         {
             Completion local = completion_;
             stepable_.next_ = conter;
-            stepable_.wait_ = NULL;
+            stepable_.wait_ = nullptr;
             local.fire( err );
         }
     public:
@@ -833,7 +905,7 @@ loop:
         {
             // TODO: assert that no locks are held
             Request * req = stepable_.wait_;
-            stepable_.wait_ = NULL;
+            stepable_.wait_ = nullptr;
             if( !req ) {
                 TOOLS_ASSERT( !completion_ );
                 completion_ = notify;
@@ -848,7 +920,7 @@ loop:
         {
             ContFunc f = static_cast< ImplementationT * >( this )->streamReset();
             if( /* TOOLS_UNLIKELY */ !!f ) {
-                stepable_.wait_ = NULL;
+                stepable_.wait_ = nullptr;
                 stepable_.next_ = f;
             } else if( /* TOOLS_UNLIKELY */ !!stepable_.wait_ ) {
                 // There is still a pending request, keep returning false.
@@ -860,7 +932,7 @@ loop:
                 TOOLS_ASSERT( !!completion_ );
 #ifdef TOOLS_DEBUG
                 ContFunc f = stepable_.next_;
-                stepable_.next_ = NULL;
+                stepable_.next_ = nullptr;
                 s = ( static_cast< ImplementationT * >( this )->*f )();
 #else // TOOLS_DEBUG
                 s = ( static_cast< ImplementationT * >( this )->*( stepable_.next_ ))();
@@ -875,7 +947,7 @@ loop:
         StandardGenerator( void )
         {
             stepable_.next_ = &ImplementationT::first;
-            stepable_.wait_ = NULL;
+            stepable_.wait_ = nullptr;
         }
     private:
         union {

@@ -82,7 +82,7 @@ namespace tools {
             FunctorThreadLocalFactory( FactoryT && factory, tools::AutoDispose<> * ref )
                 : factory_( std::forward< FactoryT >( factory ))
             {
-                ref->reset( this );
+                *ref = this;
             }
             tools::AutoDispose<> factory( void ** itf )
             {
@@ -101,7 +101,7 @@ namespace tools {
     {
         // Get the thread-local object, creating it if neccessary.
         virtual void * get( void ) = 0;
-        /* TOOLS_FORCE_INLINE */ void * get( void * __restrict handle )
+        TOOLS_FORCE_INLINE void * get( void * __restrict handle )
         {
             void * ret = tools::impl::threadLocalGet( handle );
             if( /* TOOLS_LIKELY */ !!ret ) {
@@ -109,7 +109,7 @@ namespace tools {
             }
             return get();
         }
-        /* TOOLS_FORCE_INLINE */ void * peek( void * __restrict handle )
+        TOOLS_FORCE_INLINE void * peek( void * __restrict handle )
         {
             return tools::impl::threadLocalGet( handle );
         }
@@ -204,7 +204,7 @@ namespace tools {
 
 	struct Task
 	{
-		Task() : nextTask_( NULL ) {}
+		Task() : nextTask_( nullptr ) {}
 
 		// This gets called when the task is run.  The scheduler does not manage the
 		// lifetime of the tasks, it only controlls when they get run.  In most important
@@ -250,13 +250,13 @@ namespace tools {
 		// Enqueue a Task to run on some thread managed by this scheduler.
 		// A specific queue can be specified to enqueue the Task into. If you
         // care about knowing when the Task finishes, use fork.
-		virtual void spawn( Task &, SpawnParam const &, void * = NULL ) = 0;
+		virtual void spawn( Task &, SpawnParam const &, void * = nullptr ) = 0;
 
 		// Run the Task on many threads.  The actual number is undefined.
 		virtual AutoDispose< Request > spawnAll( Task & ) = 0;
 
 		// Start some number of Tasks, synchronizing their completion
-		// on getting a NULL from the Generator.  Disposing the Generator
+		// on getting a nullptr from the Generator.  Disposing the Generator
 		// detaches outstanding Tasks.
 		virtual AutoDispose< Generator > fork( Task * & ) = 0;
 
@@ -269,12 +269,12 @@ namespace tools {
 
 		// Ensure that any asynchronous operation (Request completion)
 		// completes on this scheduler.
-		virtual AutoDispose< Request > bind( AutoDispose< Request > &&, void * = NULL ) = 0;
+		virtual AutoDispose< Request > bind( AutoDispose< Request > &&, void * = nullptr ) = 0;
 		TOOLS_FORCE_INLINE AutoDispose< Request > bind( AutoDispose< Request > & inner )
 		{
 			return bind( std::move( inner ), TOOLS_RETURN_ADDRESS() );
 		}
-		virtual AutoDispose< Generator > bind( AutoDispose< Generator > &&, void * = NULL ) = 0;
+		virtual AutoDispose< Generator > bind( AutoDispose< Generator > &&, void * = nullptr ) = 0;
 		TOOLS_FORCE_INLINE AutoDispose< Generator > bind( AutoDispose< Generator > & inner )
 		{
 			return bind( std::move( inner ), TOOLS_RETURN_ADDRESS() );
@@ -299,7 +299,7 @@ namespace tools {
 		// Request has notified.  If the passed in Request completes
 		// before the returned Request is started, that Request will
 		// complete synchronously
-		static TOOLS_API AutoDispose< Request > fork( AutoDispose< Request > &&, void * = NULL );
+		static TOOLS_API AutoDispose< Request > fork( AutoDispose< Request > &&, void * = nullptr );
 		static inline AutoDispose< Request > fork( AutoDispose< Request > & inner )
 		{
 			return ThreadScheduler::fork( std::move( inner ), TOOLS_RETURN_ADDRESS() );

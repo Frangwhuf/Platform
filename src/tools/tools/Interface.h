@@ -22,11 +22,11 @@ namespace tools {
     {
         ///
         // Return an interface by name - the name is identified by the TOOLS_TYPE_NAME macro. This
-        // function returns NULL if the interface is not found.
+        // function returns nullptr if the interface is not found.
         virtual void * getInterface( StringId const & ) const throw() = 0;
 
         ///
-        // Typed version of getInterface - returns NULL if the interface was found.
+        // Typed version of getInterface - returns nullptr if the interface was found.
         template< typename InterfaceT >
         inline InterfaceT * getInterface( void ) const throw()
         {
@@ -54,104 +54,165 @@ namespace tools {
         , tools::Disposable
     {};
 
-    namespace impl {
-        template< typename TypeT >
-        class DisposeForbidden
-            : public TypeT
-        {
-            template< typename SomeT, typename OtherT >
-            DisposeForbidden( SomeT && param1, OtherT && param2 )
-                : TypeT( a, b )
-            {} // This is here to prevent generating default constructor calls.
+    //namespace impl {
+    //    template< typename TypeT >
+    //    class DisposeForbidden
+    //        : public TypeT
+    //    {
+    //        template< typename SomeT, typename OtherT >
+    //        DisposeForbidden( SomeT && param1, OtherT && param2 )
+    //            : TypeT( a, b )
+    //        {} // This is here to prevent generating default constructor calls.
 
-            // Declaring this here (private) prevents people who have this type from calling it when not
-            // appropriate.
-            virtual void dispose( void ) = 0;
-        };
-    };  // impl namespace
+    //        // Declaring this here (private) prevents people who have this type from calling it when not
+    //        // appropriate.
+    //        virtual void dispose( void ) = 0;
+    //    };
+    //};  // impl namespace
 
     ///
     // Standard smart-pointer for Disposable items.  This is fairly compatable with
     // unique_ptr semantics.
-    template< typename TypeT = tools::Disposable >
+    template<typename TypeT = tools::Disposable>
     struct AutoDispose
     {
         typedef TypeT * PointerT;
+		class DisposeForbidden
+			: public TypeT
+		{
+			template< typename SomeT, typename OtherT >
+			DisposeForbidden(SomeT && param1, OtherT && param2)
+				: TypeT(a, b)
+			{} // This is here to prevent generating default constructor calls.
 
-        AutoDispose( PointerT const p = PointerT() ) throw() : p_( p ) {}
-        AutoDispose( AutoDispose< TypeT > && ref ) throw() : p_( ref.p_ ) {
-            // Move this pointer
-            ref.p_ = PointerT();
-        }
-        ~AutoDispose( void ) {
+			   // Declaring this here (private) prevents people who have this type from calling it when not
+			   // appropriate.
+			virtual void dispose(void) = 0;
+		};
+
+		TOOLS_FORCE_INLINE AutoDispose(void) throw() : p_(nullptr) {}
+		TOOLS_FORCE_INLINE AutoDispose(nullptr_t) throw() : p_(nullptr) {}
+		template<typename AnyT>
+		explicit TOOLS_FORCE_INLINE AutoDispose(AnyT * const & p) throw()
+			: p_(p)
+		{
+			static_assert(std::is_base_of<TypeT, AnyT>::value, "AnyT must derive from TypeT");
+		}
+		template<typename AnyT>
+		explicit TOOLS_FORCE_INLINE AutoDispose(AnyT * volatile const & p) throw()
+			: p_(p)
+		{
+			static_assert(std::is_base_of<TypeT, AnyT>::value, "AnyT must derive from TypeT");
+		}
+		// This is different from the 'AnyT *' constructors because we wish to allow implicit conversion
+		// from r-values. This makes sense as there can be no confusion of ownership in this case.
+		template<typename AnyT>
+		TOOLS_FORCE_INLINE AutoDispose(AnyT * && p) throw()
+			: p_(p)
+		{
+			static_assert(std::is_base_of<TypeT, AnyT>::value, "AnyT must derive from TypeT");
+		}
+		template<typename AnyT>
+		TOOLS_FORCE_INLINE AutoDispose(AnyT * const && p) throw()
+			: p_(p)
+		{
+			static_assert(std::is_base_of<TypeT, AnyT>::value, "AnyT must derive from TypeT");
+		}
+		template<typename AnyT>
+		TOOLS_FORCE_INLINE AutoDispose(AutoDispose<AnyT> && r) throw()
+			: p_(r.p_)
+		{
+			static_assert(std::is_base_of<TypeT, AnyT>::value, "Contents of AutoDispose<AnyT> must derive from TypeT");
+			// Move the contents
+			r.p_ = nullptr;
+		}
+        ~AutoDispose(void) throw() {
             if( !!p_ ) {
                 p_->dispose();
             }
 #ifdef TOOLS_DEBUG
             // Ensure we crash if we try to access this after dispose.
-            p_ = reinterpret_cast< PointerT >( static_cast< ptrdiff_t >( -1 ));
+            p_ = reinterpret_cast<PointerT>(static_cast<ptrdiff_t>(-1));
 #endif // TOOLS_DEBUG
         }
-        AutoDispose< TypeT > & operator=( AutoDispose< TypeT > && r ) {
-            // This is structured to be safe in the face of assignment to self and/or
-            // reenterance on dispose.
-            PointerT next = r.p_;
-            r.p_ = PointerT();
-            PointerT prev = p_;
-            p_ = next;
-            if( !!prev ) {
-                prev->dispose();
-            }
-            return *this;
-        }
-        TOOLS_FORCE_INLINE void swap( AutoDispose< TypeT > & r ) throw() {
-            PointerT t = r.p_;
-            r.p_ = p_;
-            p_ = t;
-        }
-        TOOLS_FORCE_INLINE void swap( AutoDispose< TypeT > && r ) throw() {
-            PointerT t = r.p_;
-            r.p_ = p_;
-            p_ = t;
-        }
-        TOOLS_FORCE_INLINE PointerT reset( PointerT p = PointerT() ) {
+		template<typename AnyT>
+		TOOLS_FORCE_INLINE AutoDispose<TypeT> & operator=(AutoDispose<AnyT> && r) throw() {
+			static_assert(std::is_base_of<TypeT, AnyT>::value, "Contents of AutoDipose<AnyT> must derive from TypeT");
+			// This order of operations is specifically designed to naturally work in the face of assignment to self
+			// or reenterancy on dispose.
+			PointerT next = r.p_;
+			r.p_ = nullptr;
+			PointerT prev = this->p_;
+			this->p_ = next;
+			if (!!prev) {
+				prev->dispose();
+			}
+			return *this;
+		}
+		TOOLS_FORCE_INLINE AutoDispose<TypeT> & operator=(nullptr_t) throw() {
+			return operator=(AutoDispose<TypeT>());
+		}
+		template<typename AnyT>
+		TOOLS_FORCE_INLINE AutoDispose<TypeT> & operator=(AnyT * const r) throw() {
+			static_assert(std::is_base_of<TypeT, AnyT>::value, "AnyT must derive from TypeT");
+			return operator=(AutoDispose<AnyT>(r));
+		}
+		template<typename AnyT>
+		TOOLS_FORCE_INLINE bool operator==(AutoDispose<AnyT> const & r) const throw() {
+			return (p_ == r.p_);
+		}
+		template<typename AnyT>
+		TOOLS_FORCE_INLINE bool operator==(AnyT * const r) const throw() {
+			return (p_ == r);
+		}
+		TOOLS_FORCE_INLINE bool operator==(nullptr_t) const throw() {
+			return (p_ == nullptr);
+		}
+		TOOLS_FORCE_INLINE bool operator!(void) const throw() {
+			return !p_;
+		}
+		TOOLS_FORCE_INLINE explicit operator bool(void) const throw() {
+			return (p_ != nullptr);
+		}
+		TOOLS_FORCE_INLINE DisposeForbidden * operator->(void) const throw() {
+			TOOLS_ASSERT(!!p_);
+			return static_cast<DisposeForbidden *>(p_);
+		}
+		TOOLS_FORCE_INLINE TypeT & operator*(void) const throw() {
+			TOOLS_ASSERT(!!p_);
+			return *p_;
+		}
+		TOOLS_FORCE_INLINE void swap(AutoDispose< TypeT > & r) throw() {
+			PointerT t = r.p_;
+			r.p_ = p_;
+			p_ = t;
+		}
+		TOOLS_FORCE_INLINE void swap(AutoDispose< TypeT > && r) throw() {
+			PointerT t = r.p_;
+			r.p_ = p_;
+			p_ = t;
+		}
+		TOOLS_FORCE_INLINE PointerT get(void) const throw() {
+			return p_;
+		}
+		TOOLS_FORCE_INLINE PointerT reset(void) {
             // This is structured to be safe in the face of reenterance on dispose.
-            swap( AutoDispose< TypeT >( p ));
-            return p_;
-        }
-        TOOLS_FORCE_INLINE PointerT reset( AutoDispose< TypeT > && r ) {
-            // This is structured to be safe in the face of reenterance on dispose.
-            swap( std::move( r ));
-            return p_;
-        }
-        TOOLS_FORCE_INLINE PointerT get( void ) const throw() {
-            return p_;
-        }
-        TOOLS_FORCE_INLINE PointerT release( void ) throw() {
-            TOOLS_ASSERT( !!p_ );
-            PointerT p = p_;
-            p_ = PointerT();
-            return p;
-        }
-        TOOLS_FORCE_INLINE TypeT & operator*( void ) const throw() {
-            TOOLS_ASSERT( !!p_ );
-            return *p_;
-        }
-        TOOLS_FORCE_INLINE tools::impl::DisposeForbidden< TypeT > * operator->( void ) const throw() {
-            TOOLS_ASSERT( !!p_ );
-            return static_cast< tools::impl::DisposeForbidden< TypeT > * >( p_ );
-        }
-        TOOLS_FORCE_INLINE bool operator!( void ) const throw() {
-            return !p_;
-        }
-        TOOLS_FORCE_INLINE PointerT * getAddress( void ) {
-            reset();
-            return &p_;
-        }
-        TOOLS_FORCE_INLINE PointerT * atomicAccess( void ) {  // I hate that this exists
-            return &p_;
-        }
-        //TOOLS_FORCE_INLINE void atomicSwap( AutoDispose< TypeT > & r ) {
+			swap(AutoDispose<TypeT>());
+		}
+		TOOLS_FORCE_INLINE PointerT release(void) throw() {
+			TOOLS_ASSERT(!!p_);
+			PointerT p = p_;
+			p_ = PointerT();
+			return p;
+		}
+		TOOLS_FORCE_INLINE PointerT * getAddress(void) throw() {
+			reset();
+			return &p_;
+		}
+		TOOLS_FORCE_INLINE PointerT * atomicAccess(void) throw() {  // I hate that this exists
+			return &p_;
+		}
+		//TOOLS_FORCE_INLINE void atomicSwap( AutoDispose< TypeT > & r ) {
         //    PointerT t = r.p_;
         //    r.p_ = tools::atomicExchange< PointerT >( &p_, t );
         //}
@@ -167,17 +228,25 @@ namespace tools {
         //TOOLS_FORCE_INLINE PointerT atomicRead( void ) const {
         //    return tools::atomicRead< PointerT >( &p_ );
         //}
-        // These are only allowed in the trivial case.
-        AutoDispose( AutoDispose< TypeT > const & r ) {
-            TOOLS_ASSERT( r.p_ == PointerT() );
-            p_ = Type();
-        }
-        TOOLS_FORCE_INLINE AutoDispose< TypeT > & operator=( AutoDispose< TypeT > const & r ) {
-            TOOLS_ASSERT( r.p_ == NULL );
-            reset();
-            return *this;
-        }
-    private:
+
+		// These are only allowed in the trivial case.
+        //AutoDispose( AutoDispose< TypeT > const & r ) {
+        //    TOOLS_ASSERT( r.p_ == PointerT() );
+        //    p_ = Type();
+        //}
+        //TOOLS_FORCE_INLINE AutoDispose< TypeT > & operator=( AutoDispose< TypeT > const & r ) {
+        //    TOOLS_ASSERT( r.p_ == nullptr );
+        //    reset();
+        //    return *this;
+        //}
+		AutoDispose(AutoDispose<TypeT> const &) = delete;
+		AutoDispose<TypeT> & operator=(AutoDispose<TypeT> const &) = delete;
+    protected:
+		// The following is needed to allow implicit conversion when moving from AutoDispose<derived> to
+		// AutoDispose<base> without breaking encapsulation by introducing public helper methods.
+		template<typename AnyT>
+		friend struct AutoDispose;
+
         PointerT p_;
     };
 
@@ -188,7 +257,7 @@ namespace tools {
 
     template< typename TypeT >
     inline void setEnd( tools::AutoDispose< TypeT > & ad ) {
-        ad.release();
+        ad = nullptr;
     }
 
     TOOLS_API AutoDispose<> nullDisposable( void );
@@ -201,7 +270,7 @@ namespace tools {
         typedef InterfaceT & ReferenceT;
         typedef tools::AutoDisposePair< InterfaceT, AutoDispT > ThisT;
 
-        AutoDisposePair( void ) : p_( NULL ) {}
+        AutoDisposePair( void ) : p_( nullptr ) {}
         AutoDisposePair( ReferenceT p, AutoDispT && life )
             : p_( &p )
             , lifetime_( std::move( life ))
@@ -220,17 +289,24 @@ namespace tools {
         {
             TOOLS_ASSERT( !!p_ == !!lifetime_ );
         }
+        template< typename OtherT >
+        AutoDisposePair( OtherT && other )
+            : p_( other )
+            , lifetime_( std::move( other ))
+        {
+            TOOLS_ASSERT( !!p_ == !!lifetime_ );
+        }
         AutoDisposePair( ThisT && r )
             : p_( r.p_ )
-            , lifetime_( std::move( lifetime_ ))
+            , lifetime_( std::move( r.lifetime_ ))
         {
-            r.p_ = NULL;
+            r.p_ = nullptr;
             TOOLS_ASSERT( !!p_ == !!lifetime_ );
             TOOLS_ASSERT( !!r.p_ == !!r.lifetime_ );
         }
         // only 'copy' empty AutoDisposePairs<>
         AutoDisposePair( ThisT const & r )
-            : p_( NULL )
+            : p_( nullptr )
         {
             TOOLS_ASSERT( !r.p_ );
         }
@@ -284,7 +360,7 @@ namespace tools {
         }
         TOOLS_FORCE_INLINE void reset( void )
         {
-            p_ = NULL;
+            p_ = nullptr;
             lifetime_.reset();
         }
         TOOLS_FORCE_INLINE void reset( ReferenceT p, AutoDispT && life )
@@ -302,7 +378,7 @@ namespace tools {
         TOOLS_FORCE_INLINE ThisT & operator=( ThisT && r )
         {
             PointerT t = r.p_;
-            r.p_ = NULL;
+            r.p_ = nullptr;
             p_ = t;
             lifetime_ = std::move( r.lifetime_ );
             return *this;
@@ -384,11 +460,11 @@ namespace tools {
             p_ = t;
         }
         //FlagPointer< AnyT > & operator=( FlagPointer< AnyT > const & c ) volatile {
-        //    TOOLS_ASSERT( p_ == NULL );
+        //    TOOLS_ASSERT( p_ == nullptr );
         //    p_ = c.p_;
         //    return *this;
         //}
-        static FlagPointer< AnyT > make( AnyT * p = NULL, bool flag = false ) {
+        static FlagPointer< AnyT > make( AnyT * p = nullptr, bool flag = false ) {
             FlagPointer< AnyT > ret;
             ret.reset( p, flag );
             return ret;
@@ -438,7 +514,7 @@ namespace tools {
     template< typename DefaultAnyT, typename OtherAnyT >
     struct AlternatePointer
     {
-        explicit AlternatePointer( DefaultAnyT * defP = NULL ) {
+        explicit AlternatePointer( DefaultAnyT * defP = nullptr ) {
             defaultPtr_.reset( defP );
         }
         explicit AlternatePointer( OtherAnyT * otherP ) {
@@ -478,11 +554,11 @@ namespace tools {
         }
         DefaultAnyT * default( void ) {
             DefaultAnyT * ret = defaultPtr_.p_;
-            return !isEnd( defaultPtr_ ) ? ret : NULL;
+            return !isEnd( defaultPtr_ ) ? ret : nullptr;
         }
         OtherAnyT * other( void ) {
             OtherAnyT * ret = otherPtr_.get();
-            return isEnd( otherPtr_ ) ? ret : NULL;
+            return isEnd( otherPtr_ ) ? ret : nullptr;
         }
         void reset( DefaultAnyT * defP ) {
             defaultPtr_.reset( defP );
@@ -490,7 +566,7 @@ namespace tools {
         void reset( OtherAnyT * otherP ) {
             otherPtr_.reset( otherP, true );
         }
-        // This version is slightly faster. There is no check for NULL on top of the flag check.
+        // This version is slightly faster. There is no check for nullptr on top of the flag check.
         bool as( OtherAnyT ** ref ) const {
             *ref = otherPtr_.get();
             return ( *ref != otherPtr_.p_ );
@@ -550,18 +626,18 @@ namespace tools {
 
       struct ResourceSample
       {
-          ResourceSample( size_t size, void * site, ResourceTrace * parent = NULL )
+          ResourceSample( size_t size, void * site, ResourceTrace * parent = nullptr )
               : size_( size )
               , site_( site )
               , parent_( parent )
           {}
-          ResourceSample( size_t size, StringId const & name, void * site = NULL, ResourceTrace * parent = NULL )
+          ResourceSample( size_t size, StringId const & name, void * site = nullptr, ResourceTrace * parent = nullptr )
               : size_( size)
               , site_( site )
               , name_( name )
               , parent_( parent )
           {}
-          TOOLS_NO_INLINE ResourceSample( size_t size, ResourceTrace * parent = NULL )
+          TOOLS_NO_INLINE ResourceSample( size_t size, ResourceTrace * parent = nullptr )
               : size_( size )
               , site_( TOOLS_RETURN_ADDRESS() )
               , parent_( parent )
@@ -575,7 +651,7 @@ namespace tools {
           void * site_;  // Function/method that is the source of the allocation.
           StringId name_;
           ResourceTrace * parent_;  // Parent allocation (if this allocation is contained
-                                    // in another).  This may be NULL for a top-level
+                                    // in another).  This may be nullptr for a top-level
                                     // allocation.
       };
 
@@ -599,10 +675,10 @@ namespace tools {
           resourceTraceDumpPhaseAll,
       };
 
-      TOOLS_API ResourceTrace * resourceTraceBuild( ResourceSample const &, ResourceTrace * = NULL );
-      TOOLS_API ResourceTrace * resourceTraceBuild( unsigned interval, ResourceSample const &, ResourceTrace * = NULL );
-      TOOLS_API ResourceTrace * resourceTraceBuild( unsigned interval, StringId const &, size_t nbytes, ResourceTrace * = NULL );
-      TOOLS_API ResourceTrace * resourceTraceBuild( StringId const &, ResourceTrace * = NULL );
+      TOOLS_API ResourceTrace * resourceTraceBuild( ResourceSample const &, ResourceTrace * = nullptr );
+      TOOLS_API ResourceTrace * resourceTraceBuild( unsigned interval, ResourceSample const &, ResourceTrace * = nullptr );
+      TOOLS_API ResourceTrace * resourceTraceBuild( unsigned interval, StringId const &, size_t nbytes, ResourceTrace * = nullptr );
+      TOOLS_API ResourceTrace * resourceTraceBuild( StringId const &, ResourceTrace * = nullptr );
       TOOLS_API void resourceTraceDump( ResourceTrace * );
   };  // impl namespace
 }; // namespace tools
@@ -612,5 +688,5 @@ namespace tools {
 #define TOOLS_RESOURCE_SAMPLE_CALLER( sz ) tools::impl::ResourceSample( sz, TOOLS_RETURN_ADDRESS() )
 #define TOOLS_RESOURCE_SAMPLE_CALLER_T( sz, t ) tools::impl::ResourceSample( sz, TOOLS_RETURN_ADDRESS(), t )
 #define TOOLS_RESOURCE_SAMPLE_HERE( sz ) tools::impl::ResourceSample( sz )
-#define TOOLS_RESOURCE_SAMPLE_NAMED( sz, name ) tools::impl::ResourceSample( sz, name, NULL, NULL )
-#define TOOLS_RESOURCE_SAMPLE_NAMED_T( sz, name, t ) tools::impl::ResourceSample( sz, name, NULL, t )
+#define TOOLS_RESOURCE_SAMPLE_NAMED( sz, name ) tools::impl::ResourceSample( sz, name, nullptr, nullptr )
+#define TOOLS_RESOURCE_SAMPLE_NAMED_T( sz, name, t ) tools::impl::ResourceSample( sz, name, nullptr, t )

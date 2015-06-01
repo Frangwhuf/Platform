@@ -60,7 +60,7 @@ DllMain(
 
                 //InitializeCriticalSection(&win32Globals.diag_console_cs);
                 //win32Globals.diag_console_prev_level = 0;
-                //win32Globals.diag_console_prev_src = NULL
+                //win32Globals.diag_console_prev_src = nullptr
 
                 SetConsoleCtrlHandler(&CtrlHandlerCallback, TRUE);
         case DLL_THREAD_ATTACH:
@@ -69,7 +69,7 @@ DllMain(
                 //tlsData->diag_state.buffer = static_cast< char * >( affinity_platform().alloc( 4096 ));
                 //tlsData->diag_state.buffer_sz = 4096;
                 //tlsData->diag_state.indent_level = 0;
-                //tlsData->lkCurrent = NULL;
+                //tlsData->lkCurrent = nullptr;
 
                 //TlsSetValue( tlsSlot, tls_data );
                 break;

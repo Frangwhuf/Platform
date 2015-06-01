@@ -11,7 +11,7 @@ namespace tools {
     // returned disposable is disposed.
     TOOLS_API AutoDispose<> registryInsert( StringId const &, StringId const &, void * ) throw();
 
-    // Fetch a registered item by name (or return NULL if no such entry was found)
+    // Fetch a registered item by name (or return nullptrptr if no such entry was found)
     TOOLS_API void * registryFetch( StringId const &, StringId const & ) throw();
 
     // Typesafe accessors
@@ -231,7 +231,7 @@ namespace tools {
             tools::AutoDispose<> link( void ** service, StringId const & name ) {
                 Instance * new_ = new Instance( name );
                 *service = static_cast< typename tools::ServiceInterfaceOf< ServiceT >::Type * >( &new_->impl_ );
-                return new_;
+                return std::move(new_);
             }
         };
 
@@ -255,7 +255,7 @@ namespace tools {
 
             tools::AutoDispose<> link( void ** bound, StringId const & name ) {
                 // Trampoline to local variable to ensure single assignment.
-                typename tools::ServiceInterfaceOf< ServiceT >::Type * itf = NULL;
+                typename tools::ServiceInterfaceOf< ServiceT >::Type * itf = nullptr;
                 tools::AutoDispose<> new_( func_( &itf, name ));
                 *bound = itf;
                 return new_;
@@ -268,8 +268,8 @@ namespace tools {
         RegisterFactoryRegistryFunctor( FactoryT const & func )
         {
             FactoryImpl< FactoryT > * new_ = new FactoryImpl< FactoryT >( func );
-            factory_.reset( new_ );
-            registration_.reset( tools::registryInsert< tools::FactoryRegistry, ServiceT >( new_ ));
+            factory_ = new_;
+            registration_ = tools::registryInsert< tools::FactoryRegistry, ServiceT >( new_ );
         }
 
         tools::AutoDispose<> factory_;
@@ -277,7 +277,7 @@ namespace tools {
     };
 
     // This inverts the relationship between a service and type by presenting a bundle of services with
-    // an implied type, rather than the other way around.  Null is returned when there is no service
+    // an implied type, rather than the other way around.  nullptr is returned when there is no service
     // present.  In general this isn't faster than doing a dual lookup, but it is likely much more
     // convenient.
     struct AnyService

@@ -35,9 +35,11 @@ namespace tools {
             size_t hash_;
             size_t length_;
 
+			StringIdData( void ) = delete;
             StringIdData( char const * str, size_t hsh, size_t len ) : string_( str ), hash_( hsh ), length_( len ) {}
-        protected:
-            StringIdData( void ) {}
+			TOOLS_FORCE_INLINE bool operator==( StringIdData const & r ) const {
+				return (string_ == r.string_) & (length_ == r.length_);
+			}
         };
     };  // namespace impl
 
@@ -59,7 +61,7 @@ namespace tools {
         {}
     public:
         StringId( void ) throw()
-            : data_( NULL )
+            : data_( nullptr )
 #ifdef STRINGID_DEBUGGING
             , thisPointer_( this )
 #endif // STRINGID_DEBUGGING
@@ -163,7 +165,7 @@ namespace tools {
             TOOLS_ASSERT( thisPointer_ == this );
 #endif // STRINGID_DEBUGGING
             if( !data_ ) {
-                return NULL;
+                return nullptr;
             }
             return data_->string_;
         }

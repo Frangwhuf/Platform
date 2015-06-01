@@ -90,8 +90,8 @@ namespace {
     mbp.result = 0;
     mbp.event = anEvent;
     DWORD threadId;
-    HANDLE aThread = CreateThread( NULL, 0, &SyncAssertThreadProc, &mbp, 0, &threadId );
-    if( aThread != NULL ) {
+    HANDLE aThread = CreateThread( nullptr, 0, &SyncAssertThreadProc, &mbp, 0, &threadId );
+    if( aThread != nullptr ) {
         SetThreadPriority( aThread, THREAD_PRIORITY_HIGHEST );
         impl::SetThreadName( threadId, "Timer thread" );
         WaitForSingleObject( anEvent, INFINITE );
@@ -151,7 +151,7 @@ int tools::ToolsHandleAssertFailure( char const * /*assertion*/, char const * fi
     int nCode;
     {
       {
-        nCode = static_cast< int >( SyncMessageBoxA( NULL, msg.str().c_str(), "Assertion Failed!",
+        nCode = static_cast< int >( SyncMessageBoxA( nullptr, msg.str().c_str(), "Assertion Failed!",
                                  MB_ABORTRETRYIGNORE|MB_ICONHAND|MB_SETFOREGROUND|MB_TASKMODAL ));
       }
       // Retry: call the debugger

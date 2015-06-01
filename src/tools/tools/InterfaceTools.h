@@ -11,7 +11,7 @@ namespace tools {
         , AllocT
     {
         void * getInterfaceDynamic( StringId const & ) const throw() {
-            return NULL;
+            return nullptr;
         }
     protected:
         template< typename IteratorT >
@@ -19,7 +19,7 @@ namespace tools {
             if (typeName == tools::nameOf< typename boost::mpl::deref< IteratorT >::type >() ) {
                 return static_cast< typename boost::mpl::deref< IteratorT >::type * >( const_cast< ImplementationT * >( static_cast< ImplementationT const * >( this )));
             }
-            return getInterfaceImpl( typeName, static_cast< typename boost::mpl::next< IteratorT >::type * >( NULL ));
+            return getInterfaceImpl( typeName, static_cast< typename boost::mpl::next< IteratorT >::type * >( nullptr ));
         }
 
         // This terminates the iteration.
@@ -28,7 +28,7 @@ namespace tools {
         }
     public:
         void * getInterface( StringId const & typeName ) const throw() {
-            return getInterfaceImpl( typeName, static_cast< typename boost::mpl::begin< SequenceT >::type * >( NULL ) );
+            return getInterfaceImpl( typeName, static_cast< typename boost::mpl::begin< SequenceT >::type * >( nullptr ) );
         }
     };
 
@@ -57,8 +57,8 @@ namespace tools {
 		typedef ReturnT (*FunctionT)( void *, ParameterT );
 
 		Delegate( void )
-			: func_( NULL )
-			, param_( NULL )
+			: func_( nullptr )
+			, param_( nullptr )
 		{}
 		Delegate( FunctionT func, void * param )
 			: func_( func )
@@ -84,8 +84,8 @@ namespace tools {
 		{
 			FunctionT f = func_;
 			void * param = param_;
-			func_ = NULL;
-			param_ = NULL;
+			func_ = nullptr;
+			param_ = nullptr;
 			f( param, p );
 		}
 
@@ -98,8 +98,8 @@ namespace tools {
 		typedef ReturnT (*FunctionT)( void * );
 
 		Delegate( void )
-			: func_( NULL )
-			, param_( NULL )
+			: func_( nullptr )
+			, param_( nullptr )
 		{}
 		Delegate( FunctionT func, void * param )
 			: func_( func )
@@ -125,8 +125,8 @@ namespace tools {
 		{
 			FunctionT f = func_;
 			void * param = param_;
-			func_ = NULL;
-			param_ = NULL;
+			func_ = nullptr;
+			param_ = nullptr;
 			f( param );
 		}
 
@@ -358,7 +358,7 @@ namespace tools {
       };
 
       // The caller is made to pass in storage to minimize the possibility of allocation while inside this.
-      // The previous contents should be considered lost. If no storage is passed (NULL), this function will
+      // The previous contents should be considered lost. If no storage is passed (nullptr), this function will
       // allocate its own.
       TOOLS_API void resourceTraceDump(ResourceTraceDumpPhase, bool, std::vector< ResourceTraceSum, AllocatorAffinity< ResourceTraceSum, Platform >> * );
     };  // impl namespace

@@ -1552,7 +1552,7 @@ affinityVerifyNew(
     }
     VerifyAffinity * ret = new VerifyAffinity( trackingInterval, *inner, innerDispose, trace, forkOut, checkRt );
     *outAffinity = ret;
-    return ret;
+    return std::move(ret);
 }
 
 static void
@@ -1815,7 +1815,7 @@ poolBinaryLocalBufferNew(
     size_t tailUnits = ( 1024U * 1024U ) / master.desc_.size_;
     BinaryPoolThreadBuffer * newPool = new( tailUnits ) BinaryPoolThreadBuffer( &master );
     *referencePool = newPool;
-    return newPool;
+    return std::move(newPool);
 }
 
 static AutoDispose<>
@@ -1832,12 +1832,11 @@ poolBufferNew(
     if( max > 0 ) {
         BufferingPool * ret = new( max ) BufferingPool( inner, sample, max );
         *referencePool = ret;
-        return ret;
-    } else {
-        BufferingPoolNil * ret = new BufferingPoolNil( inner, sample );
-        *referencePool = ret;
-        return ret;
+        return std::move(ret);
     }
+    BufferingPoolNil * ret = new BufferingPoolNil( inner, sample );
+    *referencePool = ret;
+    return std::move(ret);
 #endif // TOOLS_MEM_PLATFORM
 }
 
@@ -1863,7 +1862,7 @@ poolMallocNew(
 {
     MallocPool * newPool = new MallocPool( sample, size, phase );
     *referencePool = newPool;
-    return newPool;
+    return std::move(newPool);
 }
 
 static AutoDispose<>
@@ -1879,7 +1878,7 @@ poolNodeNew(
 #else // TOOLS_MEM_PLATFORM
     NodePool * ret = new NodePool( parent, sample, size, phase );
     *referencePool = ret;
-    return ret;
+    return std::move(ret);
 #endif // TOOLS_MEM_PLATFORM
 }
 
@@ -1897,7 +1896,7 @@ poolNodeSyncNew(
 #else // TOOLS_MEM_PLATFORM
     NodePoolSync * ret = new NodePoolSync( parent, sample, size, phase, align );
     *referencePool = ret;
-    return ret;
+    return std::move(ret);
 #endif // TOOLS_MEM_PLATFORM
 }
 
@@ -1914,7 +1913,7 @@ poolNodeThreadedNew(
 #else // TOOLS_MEM_PLATFORM
     NodeSmallPool * ret = new NodeSmallPool( parent, sample, size, phase );
     *referencePool = ret;
-    return ret;
+    return std::move(ret);
 #endif // TOOLS_MEM_PLATFORM
 }
 
@@ -1927,7 +1926,7 @@ memoryWrapPoolNew(
 {
     MemoryWrapPool * ret = new MemoryWrapPool( base, length, size );
     *referencePool = ret;
-    return ret;
+    return std::move(ret);
 }
 
 static bool
@@ -1969,7 +1968,7 @@ poolBinaryNew(
 {
     BinaryPool * newPool = new BinaryPool( inner, sample );
     *referencePool = newPool;
-    return newPool;
+    return std::move(newPool);
 }
 
 namespace tools
@@ -2203,7 +2202,7 @@ namespace tools
     {
         VmemPoolUniqueAddr * ret = new VmemPoolUniqueAddr( sample, size, phase, level );
         *ref = ret;
-        return ret;
+        return std::move(ret);
     }
 
     Heap &
@@ -2230,7 +2229,7 @@ affinityTemporalThreadLocalNew(
         return affinityVerifyNew( impl::memoryTrackingIntervalTemporal(), affinity, ret, ret, impl::resourceTraceBuild( sample ), nullptr );
     } else {
         *affinity = ret;
-        return ret;
+        return std::move(ret);
     }
 }
 
@@ -3144,7 +3143,7 @@ AffinityInherentThreadLocal::fork(
     AffinityInherentForkBound * forked = new( sample ) AffinityInherentForkBound( *inner_,
         sample, *root_ );
     *referenceAffinity = forked;
-    return forked;
+    return std::move(forked);
 }
 
 /////////////////////////////////////
@@ -3251,7 +3250,7 @@ AffinityInherentMaster::fork(
 {
     AffinityInherentMaster * forked = new( sample ) AffinityInherentMaster( *inner_, root_, sample, 16, true );
     *referenceAffinity = forked;
-    return forked;
+    return std::move(forked);
 }
 
 BinaryPoolMaster *
@@ -3298,7 +3297,7 @@ AffinityInherentMaster::newPool(
         // the current thread.
         FanoutPool * newPool = new FanoutPool( *this, threadLocal_, binaryMasterSizeFromSize( spec.size_ ));
         *referencePool = newPool;
-        return newPool;
+        return std::move(newPool);
     }
 #ifdef TOOLS_NEW_PAGE_POOL
     // Other scales are implemented as ordinary sync node pools made against a super-block
@@ -3774,7 +3773,7 @@ AffinityInherentForkBound::fork(
     // Make another one of these
     AffinityInherentForkBound * forkOf = new( sample ) AffinityInherentForkBound( *inner_, sample, *root_ );
     *referenceAffinity = forkOf;
-    return forkOf;
+    return std::move(forkOf);
 }
 
 /////////////////////////
@@ -5544,7 +5543,7 @@ ThreadLocalTemporalAffinity::fork(
     // Convert the parent to a bound affinity
     ThreadLocalTemporalAffinityFork * aff = new ThreadLocalTemporalAffinityFork( *parent_, impl::resourceTraceBuild( sample ), leakProtect_ );
     *refferenceAffinity = aff;
-    return aff;
+    return std::move(aff);
 }
 
 Pool &
@@ -5673,7 +5672,7 @@ TemporalAffinity::TemporalAffinity(
     , leakProtect_( leakProtect )
 {
     if( forkParent ) {
-        parentDisp_.reset( parent.fork( &parent_ ));
+        parentDisp_ = parent.fork( &parent_ );
     } else {
         parent_ = &parent;
     }
@@ -5697,7 +5696,7 @@ TemporalAffinity::fork(
     TemporalAffinity * aff = new TemporalAffinity( false, *parent_,
         impl::resourceTraceBuild( sample, trace_ ), leakProtect_ );
     *referenceAffinity = aff;
-    return aff;
+    return std::move(aff);
 }
 
 Pool &
@@ -5815,5 +5814,5 @@ static tools::RegisterFactoryRegistryFunctor< tools::detail::CyclicPoolDesc > re
     []( tools::detail::CyclicPoolDesc ** ref, tools::StringId const & name )->AutoDispose<> {
         CyclicPoolDescImpl * newItem = new CyclicPoolDescImpl( name );
         *ref = newItem;
-        return newItem;
+        return std::move(newItem);
     });

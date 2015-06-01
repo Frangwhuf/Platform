@@ -267,7 +267,7 @@ namespace tools {
             // Make sure the destruct key is registered first.
             threadLocalBegin();
             pthread_key_t key;
-            int ret = pthread_key_create( &key, NULL );
+            int ret = pthread_key_create( &key, nullptr );
             TOOLS_ASSERT( ret == 0 );
             return reinterpret_cast< void * >( static_cast< size_t >( key ));
         }
@@ -569,7 +569,7 @@ PthreadMonitorUnlock::dispose( void )
 
 PthreadMutexMonitor::PthreadMutexMonitor( void )
 {
-    pthread_mutex_init( &lock_, NULL );
+    pthread_mutex_init( &lock_, nullptr );
 }
 
 PthreadMutexMonitor::~PthreadMutexMonitor( void )
@@ -584,7 +584,7 @@ PthreadMutexMonitor::enter(
 {
     if( tryOnly ) {
         return ( pthread_mutex_trylock( &lock_ ) == 0 ) ?
-            static_cast< PthreadMonitorUnlock * >( this ) : NULL;
+            static_cast< PthreadMonitorUnlock * >( this ) : nullptr;
     }
     pthread_mutex_lock( &lock_ );
     return static_cast< PthreadMonitorUnlock * >( this );
@@ -596,7 +596,7 @@ PthreadMutexMonitor::enter(
 
 PthreadCvar::PthreadCvar( void )
 {
-    pthread_cond_init( &cvar_, NULL );
+    pthread_cond_init( &cvar_, nullptr );
 }
 
 PthreadCvar::~PthreadCvar( void )
@@ -619,8 +619,8 @@ PthreadCvar::wait( void )
     Disposable * lock = lockVal->lock_;
     TOOLS_ASSERT( !!lockVal );
     TOOLS_ASSERT( !!lock );
-    *cvarMonitor = NULL;
-    lockVal->lock_ = NULL;
+    *cvarMonitor = nullptr;
+    lockVal->lock_ = nullptr;
     pthread_cond_wait( &cvar_, &static_cast< PthreadMutexMonitor * >( lockVal->monitor_ )->lock_ );
     TOOLS_ASSERT( !lockVal->lock_ );
     lockVal->lock_ = lock;
@@ -672,7 +672,7 @@ ThreadingImpl::forkAll(
 UnixEvent::UnixEvent( void )
     : posted_( false )
 {
-    pthread_mutex_init( &lock_, NULL );
+    pthread_mutex_init( &lock_, nullptr );
     pthread_condattr_t attr;
     pthread_condattr_init( &attr );
     auto ret = pthread_condattr_setclock( &attr, CLOCK_MONOTONIC );
@@ -729,7 +729,7 @@ UnixPosixThread::UnixPosixThread(
     , event_( new UnixEvent() )
     , synced_( 0 )
 {
-    int res = pthread_create( &thread_, NULL, &UnixPosixThread::entry, this );
+    int res = pthread_create( &thread_, nullptr, &UnixPosixThread::entry, this );
     //TOOLS_ASSERT( res == 0 && !!thread_ );
     event_->post();
 }
@@ -742,7 +742,7 @@ UnixPosixThread::~UnixPosixThread( void )
 void
 UnixPosixThread::waitSync( void )
 {
-    int res = pthread_join( thread_, NULL );
+    int res = pthread_join( thread_, nullptr );
     TOOLS_ASSERT( !res );
 }
 
@@ -751,7 +751,7 @@ UnixPosixThread::wait( void )
 {
     // TODO: figure out how to do this better
     waitSync();
-    return NULL;
+    return nullptr;
 }
 
 void *
@@ -762,7 +762,7 @@ UnixPosixThread::entry(
     self->event_->wait();
     atomicIncrement( &self->synced_ );
     self->thunk_();
-    return NULL;
+    return nullptr;
 }
 
 /////////////////////
@@ -786,7 +786,7 @@ UnixPosixThreadAll::~UnixPosixThreadAll( void )
 {
     std::for_each( threads_, threads_ + numThreads_, [&]( pthread_t & t )->void {
 	if( t != static_cast< pthread_t >( -1 )) {
-	    int e = pthread_join( t, NULL );
+	    int e = pthread_join( t, nullptr );
 	    TOOLS_ASSERT( !e );
 	}
     });
@@ -797,7 +797,7 @@ UnixPosixThreadAll::start( void )
 {
     numRunning_ = numThreads_;
     std::for_each( threads_, threads_ + numThreads_, [&]( pthread_t & t )->void {
-	int e = pthread_create( &t, NULL, &UnixPosixThreadAll::entry, this );
+	int e = pthread_create( &t, nullptr, &UnixPosixThreadAll::entry, this );
 	TOOLS_ASSERT( !e );
     });
 }
@@ -811,7 +811,7 @@ UnixPosixThreadAll::entry(
     if( !atomicDecrement( &self->numRunning_ )) {
         self->finish();
     }
-    return NULL;
+    return nullptr;
 }
 
 /////////////////////////
@@ -856,7 +856,7 @@ UnixThreadSleepVariable::wakeOne( void )
 {
     auto start = impl::getHighResTime();
     atomicAdd( &seq_, 2 );
-    sysFutex( &seq_, FUTEX_WAKE_PRIVATE, 1, NULL, NULL, 0 );
+    sysFutex( &seq_, FUTEX_WAKE_PRIVATE, 1, nullptr, nullptr, 0 );
     auto now = impl::getHighResTime();
     if( ( now - start ) > (100U * TOOLS_NANOSECONDS_PER_MILLISECOND )) {
         // convert this to logging
@@ -875,7 +875,7 @@ UnixThreadSleepVariable::wakeAll( bool stopping )
     } else {
         atomicAdd( &seq_, 2 );
     }
-    sysFutex( &seq_, FUTEX_WAKE_PRIVATE, INT_MAX, NULL, NULL, 0 );
+    sysFutex( &seq_, FUTEX_WAKE_PRIVATE, INT_MAX, nullptr, nullptr, 0 );
 }
 
 void
@@ -884,7 +884,7 @@ UnixThreadSleepVariable::sleep( uint64 timeout )
     struct timespec spec;
     spec.tv_sec = timeout / TOOLS_NANOSECONDS_PER_SECOND;
     spec.tv_nsec = timeout % TOOLS_NANOSECONDS_PER_SECOND;
-    sysFutex( &seq_, FUTEX_WAIT_PRIVATE, atomicRead( &seq_ ) & ~1, &spec, NULL, 0 );
+    sysFutex( &seq_, FUTEX_WAIT_PRIVATE, atomicRead( &seq_ ) & ~1, &spec, nullptr, 0 );
 }
 
 /////////////////////////
@@ -939,7 +939,7 @@ UnixHungThreadDetector::arm( void )
     newValue.it_value.tv_nsec = checkPeriod_ % TOOLS_NANOSECONDS_PER_SECOND;
     newValue.it_interval.tv_sec = checkPeriod_ / TOOLS_NANOSECONDS_PER_SECOND;
     newValue.it_interval.tv_nsec = checkPeriod_ % TOOLS_NANOSECONDS_PER_SECOND;
-    if( timer_settime( timerId_, 0, &newValue, NULL ) != 0 ) {
+    if( timer_settime( timerId_, 0, &newValue, nullptr ) != 0 ) {
         // TODO: convert this to logging
         fprintf( stderr, "HungThreadDetector: arm timer_settime failed, errno %d\n", errno );
     }
@@ -956,7 +956,7 @@ UnixHungThreadDetector::disarm( void )
     newValue.it_value.tv_nsec = 0;
     newValue.it_interval.tv_sec = 0;
     newValue.it_interval.tv_nsec = 0;
-    if( timer_settime( timerId_, 0, &newValue, NULL ) != 0 ) {
+    if( timer_settime( timerId_, 0, &newValue, nullptr ) != 0 ) {
         // TODO: convert this to logging
         fprintf( stderr, "HungThreadDetector: disarm timer_settime failed, errno %d\n", errno );
     }

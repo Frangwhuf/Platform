@@ -6,6 +6,7 @@
 // #include <tools/Memory.h>
 #include <tools/String.h>
 #include <tools/Tools.h>
+#include <tools/WeakPointer.h>
 
 #include <boost/numeric/conversion/cast.hpp>
 
@@ -52,9 +53,9 @@ namespace std {
     {
         bool operator()( tools::impl::StringIdData * ptr1, tools::impl::StringIdData * ptr2 ) const
         {
-            if( ptr1 == ptr2 ) { return true; }
-            if( strcmp( ptr1->string_, ptr2->string_ ) == 0 ) { return true; }
-            return false;
+			bool ret = ( ptr1 == ptr2 );
+            if( ret ) { return ret; }
+			return ( strcmp( ptr1->string_, ptr2->string_ ) == 0 );
         }
     };
 }; // namespace std
@@ -74,13 +75,12 @@ namespace {
         bool isStatic_;
         uint32 refs_;
 
+		RealStringId( void ) = delete;
         RealStringId( char const * str, size_t hsh, size_t len, bool isStatic )
             : tools::impl::StringIdData( str, hsh, len )
             , isStatic_( isStatic )
             , refs_( 0 )
         {}
-    protected:
-        RealStringId( void ) : tools::impl::StringIdData() {}
     };
 
     inline char const * CopyStringContents( char const * inStr, uint32 copyChars )
@@ -129,6 +129,54 @@ namespace {
         TOOLS_ASSERT( sid->refs_ == 0 );
         GetStringTable().erase( sid );
     }
+
+	struct NewStringIdData
+		: tools::impl::StringIdData
+	{
+		bool isStatic_;
+
+		NewStringIdData( void ) = delete;
+		TOOLS_FORCE_INLINE NewStringIdData( char const * str, size_t hsh, size_t len, bool stat )
+			: tools::impl::StringIdData( str, hsh, len )
+			, isStatic_( stat )
+		{}
+		TOOLS_FORCE_INLINE NewStringIdData( tools::impl::StringIdData const & data, bool stat )
+			: tools::impl::StringIdData( data )
+			, isStatic_( stat )
+		{}
+		TOOLS_FORCE_INLINE bool operator==( NewStringIdData const & r ) const {
+			return tools::impl::StringIdData::operator==( r ) & ( isStatic_ == r.isStatic_ );
+		}
+	};
+
+	struct NewRealStringId
+		: StandardIsReferenced< NewRealStringId, NewStringIdData, AllocStatic< Platform >>
+	{};
+
+	struct StringPhantom
+		: StandardPhantomSlistElement< StringPhantom, StandardPhantom< StringPhantom, AllocStatic< Platform >>>
+	{
+		AutoDispose<NewRealStringId> data_;
+	};
+
+	TOOLS_FORCE_INLINE tools::impl::StringIdData const &
+	keyOf(StringPhantom const & v)
+	{
+		return *v.data_;
+	}
+
+	TOOLS_FORCE_INLINE uint32 defineHashAny(NewStringIdData const & nsid, uint32)
+	{
+		return static_cast<uint32>(nsid.hash_ & 0xFFFFFFFF);
+	}
+
+	typedef PhantomHashMap< StringPhantom, tools::impl::StringIdData, PhantomUniversal > NewStringTable;
+
+	static TOOLS_FORCE_INLINE NewStringTable & GetNewStringTable(void) throw()
+	{
+		static NewStringTable * table = new NewStringTable;
+		return *table;
+	}
 }; // anonymous namespace
 
 void
@@ -298,7 +346,7 @@ StringId tools::StaticStringId( char const * inStr ) throw()
 #include <tools/UnitTest.h>
 #if TOOLS_UNIT_TEST
 
-void TestRawStringTable( void )
+TOOLS_TEST_CASE("StringId.raw", [](Test &)
 {
     char const * str = "TestRawStringTable string";
     size_t len = strlen( str );
@@ -348,11 +396,9 @@ void TestRawStringTable( void )
     TOOLS_ASSERTR( i == GetStringTable().end() );
     // destroy record
     delete rid;
-}
+});
 
-TOOLS_UNIT_TEST_FUNCTION( TestRawStringTable );
-
-void TestStaticStringId( void )
+TOOLS_TEST_CASE("StringId.static", [](Test &)
 {
     char const * str = "TestStaticStringId string";
     size_t len = strlen( str );
@@ -388,11 +434,9 @@ void TestStaticStringId( void )
     i = GetStringTable().find( rid );
     TOOLS_ASSERTR( i == GetStringTable().end() );
     delete rid;
-}
+});
 
-TOOLS_UNIT_TEST_FUNCTION( TestStaticStringId );
-
-void TestNonStaticStringId( void )
+TOOLS_TEST_CASE("StringId.nonStatic", [](Test &)
 {
     char const * str = "TestNonStaticStringId string";
     size_t len = strlen( str );
@@ -452,11 +496,9 @@ void TestNonStaticStringId( void )
     i = GetStringTable().find( rid );
     TOOLS_ASSERTR( i == GetStringTable().end() );
     delete rid;
-}
+});
 
-TOOLS_UNIT_TEST_FUNCTION( TestNonStaticStringId );
-
-void TestStringIdStaticPromotion( void )
+TOOLS_TEST_CASE("StringId.static.promotion", [](Test &)
 {
     char const * str = "TestStringIdStaticPromotion string";
     size_t len = strlen( str );
@@ -497,11 +539,9 @@ void TestStringIdStaticPromotion( void )
     i = GetStringTable().find( rid );
     TOOLS_ASSERTR( i == GetStringTable().end() );
     delete rid;
-}
+});
 
-TOOLS_UNIT_TEST_FUNCTION( TestStringIdStaticPromotion );
-
-void TestNullAndEmptyStringId( void )
+TOOLS_TEST_CASE("StringId.empty", [](Test &)
 {
     StringId sid;
     TOOLS_ASSERTR( !sid );
@@ -525,22 +565,19 @@ void TestNullAndEmptyStringId( void )
     TOOLS_ASSERTR( sid == sid5 );
     StringId sid6( "TestNullAndEmptyStringId string" );
     TOOLS_ASSERTR( !IsNullOrEmptyStringId( sid6 ) );
-}
+});
 
-TOOLS_UNIT_TEST_FUNCTION( TestNullAndEmptyStringId );
-
-// void TestWiden( void )
-// {
-//   char const * str = "TestWiden string";
-//   wchar_t const * str2 = L"TestWiden string";
-//   StringId sid( str2 );
-//   StringId sid2( Widen( str ) );
-//   TOOLS_ASSERTR( sid == sid2 );
-//   std::string nstr( str );
-//   StringId sid3( Widen( nstr ) );
-//   TOOLS_ASSERTR( sid == sid3 );
-// }
-
-// TOOLS_UNIT_TEST_FUNCTION( TestWiden );
+// TODO: reinstate this
+//TOOLS_TEST_CASE("StringId.widen", [](Test &)
+//{
+//    char const * str = "TestWiden string";
+//    wchar_t const * str2 = L"TestWiden string";
+//    StringId sid( str2 );
+//    StringId sid2( Widen( str ) );
+//    TOOLS_ASSERTR( sid == sid2 );
+//    std::string nstr( str );
+//    StringId sid3( Widen( nstr ) );
+//    TOOLS_ASSERTR( sid == sid3 );
+//});
 
 #endif /* TOOLS_UNIT_TEST */

@@ -209,7 +209,7 @@ namespace tools {
                 // StandardRequest
                 RequestStep start( void )
                 {
-                    inner_.reset( parent_.serviceStart() );
+                    inner_ = parent_.serviceStart();
                     return maybeWaitFinish( inner_.get() );
                 }
 
@@ -227,7 +227,7 @@ namespace tools {
                 // StandardRequest
                 RequestStep start( void )
                 {
-                    inner_.reset( parent_.serviceStop() );
+                    inner_ = parent_.serviceStop();
                     return maybeWaitFinish( inner_.get() );
                 }
 

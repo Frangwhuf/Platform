@@ -22,7 +22,7 @@ gccDemangle(
     char const * name )
 {
     int status;
-    std::unique_ptr< char > demangledName( abi::__cxa_demangle( name, NULL, NULL, &status ) );
+    std::unique_ptr< char > demangledName( abi::__cxa_demangle( name, nullptr, nullptr, &status ) );
     StringId sidName;
     if( status == 0 && static_cast< bool >( demangledName )) {
         sidName = StringId( demangledName.get() );
@@ -63,9 +63,9 @@ detail::platformSymbolNameFromAddress(
         *offset = 0;
     }
 #if (__SIZEOF_POINTER__ == 8)
-    char a[19];  // 16 hex digits + '0x' + NULL
+    char a[19];  // 16 hex digits + '0x' + nullptr
 #else // 64-bit test
-    char a[11];  // 8 hex digits + '0x' + NULL
+    char a[11];  // 8 hex digits + '0x' + nullptr
 #endif // 64-bit test
     snprintf( a, sizeof( a ), "%p", site );
     return a;
@@ -100,16 +100,16 @@ namespace {
         char const * inBuf )
     {
         if( !inBuf ) {
-            return NULL;
+            return nullptr;
         }
         unsigned const extraSpace = 200;
         char * outBuf = static_cast< char * >( impl::safeMalloc( strlen( inBuf ) + extraSpace + 1 ));
         if( !outBuf ) {
-            return NULL;
+            return nullptr;
         }
         char * outP = outBuf;
         char const * inP = inBuf;
-        char * mangledHere = NULL;
+        char * mangledHere = nullptr;
         // Copy the string past the '(' until we hit '+'
         while( *inP ) {
             *outP = *inP;
@@ -126,7 +126,7 @@ namespace {
         // Try to demangle the symbol
         if( *inP && !!mangledHere ) {
             int status = -1;
-            char * demangled = abi::__cxa_demangle( mangledHere, NULL, NULL, &status );
+            char * demangled = abi::__cxa_demangle( mangledHere, nullptr, nullptr, &status );
             if( status == 0 ) {
                 int mangledLen = strlen( mangledHere );
                 int demangledLen = strlen( demangled );
@@ -252,5 +252,5 @@ detail::logStackTrace(
     bool includeHeader,
     bool includeRegisters )
 {
-    dumpStackTrace( includeHeader, includeRegisters, stdout, 0, NULL, NULL, false );
+    dumpStackTrace( includeHeader, includeRegisters, stdout, 0, nullptr, nullptr, false );
 }

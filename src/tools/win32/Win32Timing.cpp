@@ -84,11 +84,11 @@ tools::impl::getHighResTime( void )
 WinTimerThread::WinTimerThread( void )
     : shutdown_( 0 )
 {
-    events_[0] = CreateEvent( NULL, FALSE, FALSE, NULL );
-    events_[1] = CreateWaitableTimer( NULL, TRUE, NULL );
+    events_[0] = CreateEvent( nullptr, FALSE, FALSE, nullptr );
+    events_[1] = CreateWaitableTimer( nullptr, TRUE, nullptr );
     queue_ = std::move( tools::impl::timerQueueNew( toThunk< &WinTimerThread::wake >() ));
     DWORD i;
-    thread_ = CreateThread( NULL, 0, &WinTimerThread::threadEntry, this, 0, &i );
+    thread_ = CreateThread( nullptr, 0, &WinTimerThread::threadEntry, this, 0, &i );
     SetThreadPriority( thread_, THREAD_PRIORITY_HIGHEST );
     impl::SetThreadName( i, "timerThread" );
 }
@@ -117,7 +117,7 @@ WinTimerThread::entry( void )
         uint64 delta = queue_->eval();
         LARGE_INTEGER delay;
         delay.QuadPart = -numeric_cast< sint64 >( delta ) / 100LL;
-        BOOL ret = SetWaitableTimer( events_[1], &delay, 0, NULL, NULL, FALSE );
+        BOOL ret = SetWaitableTimer( events_[1], &delay, 0, nullptr, nullptr, FALSE );
         if( !ret ) {
             // send cancel to all threads and abort
             //AutoDipose< Error::Reference > err(xxxx);
@@ -156,14 +156,14 @@ AutoDispose< Request >
 TimingImpl::serviceStart( void )
 {
     timerThread_ = new WinTimerThread;
-    return static_cast< Request * >( NULL );
+    return static_cast< Request * >( nullptr );
 }
 
 AutoDispose< Request >
 TimingImpl::serviceStop( void )
 {
     timerThread_.reset();
-    return static_cast< Request * >( NULL );
+    return static_cast< Request * >( nullptr );
 }
 
 uint64

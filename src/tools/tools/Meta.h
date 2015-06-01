@@ -8,8 +8,8 @@ namespace tools {
         // Demangle sompiler type/function/method names into a human readable form
         TOOLS_API StringId platformDemangleTypeInfo( std::type_info const & ) throw();
         TOOLS_API StringId platformDemangleSymbol( StringId const & ) throw();
-        TOOLS_API StringId platformSymbolNameFromAddress( void *, unsigned * = NULL );
-        TOOLS_API StringId symbolNameFromAddress( void *, unsigned * = NULL );
+        TOOLS_API StringId platformSymbolNameFromAddress( void *, unsigned * = nullptr );
+        TOOLS_API StringId symbolNameFromAddress( void *, unsigned * = nullptr );
         TOOLS_API void logStackTrace( bool, bool );
 
         // Standard type to name implementation, overload this using ADL to take control of an
@@ -43,7 +43,7 @@ namespace tools {
 
     // Return a StringId for a given type.  This is good for comparing types, diagnostics, etc.
     template< typename TypeT >
-    inline StringId const & nameOf( TypeT *** = NULL ) {
+    inline StringId const & nameOf( TypeT *** = nullptr ) {
         return *tools::staticServiceCacheFetch< StringId, TypeT >();
     }
 

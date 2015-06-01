@@ -33,9 +33,9 @@ using namespace tools;
 size_t volatile trackedUntracked = 0;
 size_t trackedPad[ 7 ];
 // If true, do stack trace based tracking of 'untracked' memory. Very expensive in memory and CPU.
-// This should be made into something controlled by Configuration. While this is NULL, this tracking
+// This should be made into something controlled by Configuration. While this is nullptr, this tracking
 // is disabled.
-bool const * trackComplete = NULL;
+bool const * trackComplete = nullptr;
 // This should be made into something controlled by Configuration. May need to change TrackedUntrackedStackTrace.
 unsigned const stackLevels = 40;
 __thread unsigned insideTrackedMalloc;
@@ -172,7 +172,7 @@ namespace {
         typename std::allocator< TypeT >::pointer
         allocate(
             typename std::allocator< TypeT >::size_type count,
-            void const * hint = NULL )
+            void const * hint = nullptr )
         {
             void * ret = untrackedMalloc( count * sizeof( TypeT ));
             return static_cast< pointer >( ret );
@@ -362,7 +362,7 @@ namespace tools {
         {
             // size is assumed to be rounded up to page size, but not 'huge page size'. Thus we don't
             // have MAP_HUGETLB.
-            void * ret = mmap( NULL, size, PROT_READ | PROT_WRITE, MAP_POPULATE | MAP_ANONYMOUS | MAP_PRIVATE, -1, 0 );
+            void * ret = mmap( nullptr, size, PROT_READ | PROT_WRITE, MAP_POPULATE | MAP_ANONYMOUS | MAP_PRIVATE, -1, 0 );
             if( ret == MAP_FAILED ) {
                 outOfMemoryDie();
             }
@@ -559,7 +559,7 @@ namespace tools {
             {
                 // TODO: reinstate this
                 // ComplainTimer< 100 > t( logSink_, "VmemPool::mmap (large pages)");
-                ret = untrackedMmap( NULL, size, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_HUGETLB | MAP_POPULATE | MAP_PRIVATE, -1, 0 );
+                ret = untrackedMmap( nullptr, size, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_HUGETLB | MAP_POPULATE | MAP_PRIVATE, -1, 0 );
             }
             if( p == MAP_FAILED ) {
                 // This is actually expected (thus not an error) if all of the large pages are in use.
@@ -577,7 +577,7 @@ namespace tools {
         if( ret == MAP_FAILED ) {
             // TODO: reinstate this
             // ComplainTimer< 100 > t( logSink_, "VmemPool::mmap (small pages)" );
-            ret = untrackedMmap( NULL, size, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_POPULATE | MAP_PRIVATE, -1, 0 );
+            ret = untrackedMmap( nullptr, size, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_POPULATE | MAP_PRIVATE, -1, 0 );
         }
         if( ret == MAP_FAILED ) {
             impl::outOfMemoryDie();
@@ -620,7 +620,7 @@ getHugePageSize( void )
     p = strstr( buf, "Hugepagesize:" );
     TOOLS_ASSERT( !!p );
     p += strlen( "Hugepagesize:" );
-    size_t ret = strtol( p, NULL, 10 ) * 1024;
+    size_t ret = strtol( p, nullptr, 10 ) * 1024;
     // x86 normal page size is 4 KB, large page size is 2 MB. Sandybridge introduced 1 GB massive
     // pages. However we don't want to use those for slabs as that will have absurd amounts of
     // fragmentation. So we aim for something between 4 KB and 2 MB.
@@ -1007,7 +1007,7 @@ VmemPool::map( void )
     if( gotLargePages ) {
         atomicAdd( &largePagesAllocated_, reservationUnits );
     }
-    void * ret = NULL;
+    void * ret = nullptr;
     {
         std::unique_lock< std::mutex > l( availablePageLock_ );
         addrs_.push_back( site );
@@ -1092,7 +1092,7 @@ VmemPool::initDesc( void )
     desc_.size_ = largePageSize_;
     desc_.align_ = largePageSize_;
     desc_.phase_ = 0U;
-    desc_.trace_ = NULL;
+    desc_.trace_ = nullptr;
 }
 
 void *
@@ -1105,7 +1105,7 @@ VmemPool::popReserved( void )
         reserved_.pop_back();
         return ret;
     }
-    return NULL;
+    return nullptr;
 }
 
 void
@@ -1202,7 +1202,7 @@ AffinityMalloc::map(
             return ret;
         }
         impl::outOfMemoryDie();
-        return NULL;
+        return nullptr;
     }
     // tracked allocation
     return impl::safeMalloc( size );

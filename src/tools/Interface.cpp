@@ -97,7 +97,7 @@ ScalableCounter ResourceTraceImpl::resourceTraceImplsAllocated;
 
 struct SymbolCache {
     SymbolCache(
-        void * addr = NULL,
+        void * addr = nullptr,
         StringId const & name = tools::StringIdNull(),
         unsigned offset = 0U )
         : addr_( addr )
@@ -145,7 +145,7 @@ ResourceTraceImpl::ResourceTraceImpl(
     impl::ResourceSample const & res,
     impl::ResourceTrace * target )
     : interval_( interval )
-    , next_( NULL )
+    , next_( nullptr )
     , sample_( res )
     , target_( target )
     , currAllocated_( 0 )
@@ -234,7 +234,7 @@ symbolCacheLock()
     static AutoDispose< Monitor > symLock;
     if( !symLock ) {
         AutoDispose< Monitor > newLock( std::move( impl::monitorPlatformNew() ));
-        if( !atomicCas< Monitor *, Monitor * >( symLock.atomicAccess(), NULL, newLock.get() )) {
+        if( !atomicCas< Monitor *, Monitor * >( symLock.atomicAccess(), nullptr, newLock.get() )) {
             newLock.release();
         }
     }
@@ -317,7 +317,7 @@ resourceSampleHash(
     impl::ResourceSample const & sample,
     impl::ResourceTrace * target )
 {
-    // Hash only one of {site, name}. Prefer site, but use name if site is NULL.
+    // Hash only one of {site, name}. Prefer site, but use name if site is nullptr.
     TOOLS_ASSERT( !!sample.site_ || !!sample.name_ );
     // We use use hashAnyBegin(x, 0), not hashAnyBegin(x). The former initializes the hash to a number (0),
     // the later initializes the hash to a hash of the type name 'ResourceSample'. Getting the hash of the
@@ -350,7 +350,7 @@ resourceSampleBucketPeek(
             return addrBucket;
         }
     }
-    return NULL;
+    return nullptr;
 }
 
 static impl::ResourceSample
@@ -391,8 +391,8 @@ impl::resourceTraceBuild(
     ResourceTrace * target )
 {
     // Must provide either a name or an address, which we use in searching.  Some subtlety: if name_ is
-    // initially NULL, but address isn't, then the trace's name gets updated later at runtime (see name()).
-    // But if we are provided with a non-NULL name to start with, we will use that.
+    // initially nullptr, but address isn't, then the trace's name gets updated later at runtime (see name()).
+    // But if we are provided with a non-nullptr name to start with, we will use that.
     if( !sample.name_ ) {
         TOOLS_ASSERT( !!sample.site_ );
     } else {
@@ -404,11 +404,11 @@ impl::resourceTraceBuild(
     const uint32 hash = resourceSampleHash( interval, sample, target ); // must do after size adjustment
     ResourceTraceImpl * foundRoot;
     // Keep track of this in case we're retrying
-    ResourceTraceImpl * allocatedRoot = NULL;
+    ResourceTraceImpl * allocatedRoot = nullptr;
     atomicTryUpdate( &resourceTraces_[ hash % resourceTraceTableSize ], [ =, &foundRoot, &allocatedRoot ]( ResourceTraceImpl ** ref )->bool {
         if( TOOLS_UNLIKELY( !!allocatedRoot )) {
             delete allocatedRoot;
-            allocatedRoot = NULL;
+            allocatedRoot = nullptr;
         }
         foundRoot = resourceSampleBucketPeek( interval, sample, *ref, target );
         if( !!foundRoot ) {
@@ -625,3 +625,259 @@ NullDisposable::dispose( void )
 {
     // Nothing to do, this is static
 }
+
+////////
+// Tests
+////////
+
+#include <tools/UnitTest.h>
+#if TOOLS_UNIT_TEST
+
+namespace {
+    struct Dummy
+        : Disposable
+    {
+        void dispose(void) override {}
+    };
+
+    struct Test1
+        : Disposable
+        , AllocStatic<>
+    {
+        void dispose(void) override { delete this; }
+        virtual int func(void) { return 100; }
+    };
+
+    struct Test2
+        : Test1
+    {
+        void dispose(void) override { delete this; }
+        int func(void) override { return 150; }
+    };
+
+    struct Test3 // should _not_ be derived from 1 or 2
+        : Disposable
+        , AllocStatic<>
+    {
+        void dispose(void) override { delete this; }
+        virtual int func(void) { return 200; }
+    };
+
+    struct BoolType
+    {
+        operator bool(void) const { return true; }
+    };
+
+    struct ExplicitBoolType
+    {
+        explicit operator bool(void) const { return true; }
+    };
+
+    struct Base1
+        : StandardDisposable<Base1>
+    {
+        virtual int val(void) const { return 100; }
+        virtual int val(void) { return 200; }
+    };
+
+    struct Base2
+        : Base1
+    {
+        int val(void) const override { return 150; }
+        int val(void) override { return 250; }
+    };
+
+    static TOOLS_FORCE_INLINE int passAutoDisposeRval(AutoDispose<Test1> && r) {
+        AutoDispose<Test1> local(std::move(r));
+        return local->func();
+    }
+}; // anonymous namespace
+
+TOOLS_TEST_CASE("AutoDispose.basic", [](Test &)
+{
+    // Test explicit cast to bool
+    {
+        Dummy disp;
+        AutoDispose<> l(&disp);
+        TOOLS_ASSERTR(static_cast<bool>(l));
+        l = nullptr;
+        TOOLS_ASSERTR(!static_cast<bool>(l));
+        static_assert(std::is_convertible<BoolType, int>::value, "is_convertible macro failed sanity test");
+        static_assert(!std::is_convertible<ExplicitBoolType, int>::value, "is_convertible macro failed sanity test");
+        static_assert(!std::is_convertible<AutoDispose<>, int>::value, "explicit operator bool shouldn't be convertible to int");
+    }
+    {
+        AutoDispose<Test1> t(nullptr); // This is the point of this test
+        TOOLS_ASSERTR(!t);
+    }
+    {
+        AutoDispose<Test1> t(new Test1);
+        t = nullptr; // This is the point of this test
+        TOOLS_ASSERTR(!t);
+    }
+    {
+        AutoDispose<Test1> t;
+        TOOLS_ASSERTR(!t);
+        TOOLS_ASSERTR(t == nullptr); // This is the point of this test
+    }
+    {
+        AutoDispose<Test2> t2(new Test2);
+        TOOLS_ASSERTR(!!t2);
+        auto t2ptr = t2.get();
+        AutoDispose<Test1> t1(std::move(t2)); // This is the point of this test
+        TOOLS_ASSERTR(!!t1);
+        TOOLS_ASSERTR(!t2);
+        TOOLS_ASSERTR(t2ptr == t1.get());
+        TOOLS_ASSERTR(t1->func() == 150);
+    }
+    {
+        AutoDispose<Test2> t2(new Test2);
+        TOOLS_ASSERTR(!!t2);
+        auto t2ptr = t2.get();
+        AutoDispose<Test1> t1;
+        TOOLS_ASSERTR(!t1);
+        t1 = std::move(t2); // This is the point of this test
+        TOOLS_ASSERTR(!!t1);
+        TOOLS_ASSERTR(!t2);
+        TOOLS_ASSERTR(t2ptr == t1.get());
+        TOOLS_ASSERTR(t1->func() == 150);
+    }
+    {
+        AutoDispose<Test1> t1;
+        TOOLS_ASSERTR(!t1);
+        auto t1ptr = new Test1;
+        t1 = t1ptr; // This is the point of this test
+        TOOLS_ASSERTR(!!t1);
+        TOOLS_ASSERTR(t1ptr == t1.get());
+        TOOLS_ASSERTR(t1->func() == 100);
+    }
+    {
+        AutoDispose<Test1> t1;
+        TOOLS_ASSERTR(!t1);
+        auto t2ptr = new Test2;
+        t1 = t2ptr; // This is the point of this test
+        TOOLS_ASSERTR(!!t1);
+        TOOLS_ASSERTR(t2ptr == t1.get());
+        TOOLS_ASSERTR(t1->func() == 150);
+    }
+    {
+        AutoDispose<Test1> t1(new Test1);
+        TOOLS_ASSERTR(!!t1);
+        TOOLS_ASSERTR(t1 == t1.get()); // This is the point of this test
+        TOOLS_ASSERTR(t1->func() == 100);
+    }
+    {
+        AutoDispose<Test2> t2(new Test2);
+        TOOLS_ASSERTR(!!t2);
+        AutoDispose<Test1> t1(t2.get());
+        TOOLS_ASSERTR(!!t1);
+        TOOLS_ASSERTR(t1.get() == t2.get());
+        TOOLS_ASSERTR(t1 == t2); // This is the point of this test
+        TOOLS_ASSERTR(t1->func() == t2->func());
+        TOOLS_ASSERTR(t1->func() == 150);
+        t1.release(); // So that we don't double free
+    }
+    {
+        auto t2ptr = new Test2;
+        TOOLS_ASSERTR(!!t2ptr);
+        AutoDispose<Test1> t1(t2ptr);
+        TOOLS_ASSERTR(!!t1);
+        TOOLS_ASSERTR(t1.get() == t2ptr);
+        TOOLS_ASSERTR(t1 == t2ptr); // This is the point of this test
+        TOOLS_ASSERTR(t1->func() == 150);
+    }
+    {
+        AutoDispose<Test2> t2(new Test2);
+        TOOLS_ASSERTR(!!t2);
+        auto val = passAutoDisposeRval(std::move(t2)); // This is the point of this test
+        TOOLS_ASSERTR(val == 150);
+        TOOLS_ASSERTR(!t2);
+    }
+    {
+        auto val = passAutoDisposeRval(new Test2); // This is the point of this test
+        TOOLS_ASSERTR(val == 150);
+    }
+    // Initialization from unrelated types is not allowed. Uncomment the following to see it fail to compile and emit a
+    // message that 'AnyT must derive from TypeT'.
+    //{
+    //    AutoDispose<Test1> t1(new Test3); // This is the point of this test
+    //}
+    // Move construction from unrelated types is not allowed. Uncomment the following to see it fail to compile and emit
+    // a message that 'Contents of AutoDispose<AnyT> must derive from TypeT'.
+    //{
+    //    AutoDispose<Test1> t1(new Test1);
+    //    AutoDispose<Test3> t3(std::move(t1)); // This is the point of this test
+    //}
+    // Move asignment from unrelated types is not allowed. Uncomment the following to see it fail to compile and emit a
+    // message that 'Contents of AutoDispose<AnyT> must derive from TypeT'.
+    //{
+    //    AutoDispose<Test1> t1;
+    //    AutoDispose<Test3> t3(new Test3);
+    //    t1 = std::move(t3); // This is the point of this test
+    //}
+    // Assignment from unrelated types is not allowed. Uncomment the following to see it fail to compileand emit a
+    // message that 'AnyT must derive from TypeT'.
+    //{
+    //    AutoDispose<Test1> t1;
+    //    t1 = new Test3; // This is the point of this test
+    //}
+    // Implicit conversion to owned is not allowed for non-rvalues. Uncomment the following to see it fail to compile
+    // and emit a message that 'no suitable constructor exists...' (or 'constructor ... is declared explicit', or
+    // 'cannot convert argument1 from ...').
+    //{
+    //    Test2 * t2ptr = new Test2;
+    //    auto val = passAutoDisposeRval(t2ptr); // This is the point of this test
+    //}
+});
+
+TOOLS_TEST_CASE("AutoDispose.moveCtor", [](Test &)
+{
+    AutoDispose<Base2> derived(new Base2);
+    TOOLS_ASSERTR(!!derived);
+    TOOLS_ASSERTR(derived->val() == 250);
+    AutoDispose<Base1> base(std::move(derived));
+    TOOLS_ASSERTR(!derived);
+    TOOLS_ASSERTR(!!base);
+    TOOLS_ASSERTR(base->val() == 250);
+    // Implicit upcast is not allowed. Uncomment the following to see it fail to compile.
+    //AutoDispose<Base2> fail(std::move(base));
+});
+
+TOOLS_TEST_CASE("AutoDispose.moveAssignment", [](Test &)
+{
+    AutoDispose<Base2> derived(new Base2);
+    AutoDispose<Base1> base;
+    base = std::move(derived);
+    TOOLS_ASSERTR(!derived);
+    TOOLS_ASSERTR(!!base);
+    TOOLS_ASSERTR(base->val() == 250);
+    base = nullptr;
+    TOOLS_ASSERTR(!base);
+    base = new Base2;
+    TOOLS_ASSERTR(!!base);
+    TOOLS_ASSERTR(base->val() == 250);
+    // Implicit upcast is not allowed. Uncomment the following to see it fail to compile.
+    //derived = std::move(base);
+});
+
+TOOLS_TEST_CASE("AutoDispose.equals", [](Test &)
+{
+    AutoDispose<Base2> derived(new Base2);
+    // NOTE: Be careful below, we have multiple owners of the same object. This is handled carefully at the end.
+    AutoDispose<Base1> base(derived.get());
+    AutoDispose<> disp(base.get());
+    TOOLS_ASSERTR(disp == disp);
+    TOOLS_ASSERTR(base == base);
+    TOOLS_ASSERTR(derived == derived);
+    TOOLS_ASSERTR(disp == base);
+    TOOLS_ASSERTR(disp == derived);
+    TOOLS_ASSERTR(base == disp);
+    TOOLS_ASSERTR(base == derived);
+    TOOLS_ASSERTR(derived == disp);
+    TOOLS_ASSERTR(derived == base);
+    // Cleanup
+    base.release();
+    disp.release();
+});
+
+#endif // TOOLS_UNIT_TEST

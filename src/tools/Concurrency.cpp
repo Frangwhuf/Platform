@@ -1439,7 +1439,7 @@ MonitorPool::PooledMonitor::get( void )
     do {
         previousMonitor = inner_;
         if( !!previousMonitor ) {
-            return this;
+            return std::move(this);
         }
         if( !newMonitor ) {
             newMonitor = std::move( monitorNew() );
@@ -1447,7 +1447,7 @@ MonitorPool::PooledMonitor::get( void )
     } while( atomicCas( &inner_, previousMonitor, newMonitor.get() ) != previousMonitor );
     // It's now in the list.
     newMonitor.release();
-    return this;
+    return std::move(this);
 }
 
 //////////////
@@ -1552,7 +1552,7 @@ RwMonitorImpl::WriterMonitor::enter(
         TOOLS_ASSERT( tryOnly );
         return nullptr;
     }
-    config_.reset( std::move( l_ ));
+    config_ = std::move( l_ );
 
     // Now take all of the reader locks, in order.
     TOOLS_ASSERT( locks_.empty() );
@@ -1560,7 +1560,7 @@ RwMonitorImpl::WriterMonitor::enter(
         locks_.reserve( rw_->readers_.size() * 2U );
     }
     for( auto && reader : rw_->readers_ ) {
-        l_.reset( reader->inner()->enter( tryOnly ));
+        l_ = reader->inner()->enter( tryOnly );
         if( !l_ ) {
             TOOLS_ASSERT( tryOnly );
             // We failed during a try, rewind.
@@ -3073,7 +3073,7 @@ ProxyNotifyReq::notifyInner(
 	Error * err )
 {
 	if( !!err ) {
-		error_.reset( err->ref() );
+		error_ = err->ref();
 	}
 	TOOLS_ASSERT( !nextTask_ );
 	target_.spawn( *this, param_, callSite_ );
@@ -3123,7 +3123,7 @@ ProxyNotifyGen::notifyInner(
 	Error * err )
 {
 	if( !!err ) {
-		error_.reset( err->ref() );
+		error_ = err->ref();
 	}
 	TOOLS_ASSERT( !nextTask_ );
 	target_.spawn( *this, param_, callSite_ );
@@ -3192,7 +3192,7 @@ ForkReq::notify(
 	Error * err )
 {
 	if( !!err ) {
-		error_.reset( err->ref() );
+		error_ = err->ref();
 	}
 	if( atomicDeref( &refs_ )) {
 		return;
@@ -3407,14 +3407,14 @@ ThreadingTestImpl::doTrivialThreadCreate( void )
     AutoDispose< Thread > thr( threadSvc->fork( "threadTesting", toThunk< &ThreadingTestImpl::trivialSupport >() ));
     TOOLS_ASSERTR( !!thr );
     thr->waitSync();
-    thr.reset( threadSvc->fork( "threadTesting2", toThunk< &ThreadingTestImpl::trivialSupport >() ));
+    thr = threadSvc->fork( "threadTesting2", toThunk< &ThreadingTestImpl::trivialSupport >() );
     TOOLS_ASSERTR( !!thr );
     AutoDispose< Request > done( thr->wait() );
     TOOLS_ASSERTR( !!done );
     AutoDispose< Referenced< Error >::Reference > err( runRequestSynchronously( done ));
     TOOLS_ASSERTR( !err );
     AutoDispose< Request > delay( timing_->timer( 250 * TOOLS_NANOSECONDS_PER_MILLISECOND ));
-    err.reset( runRequestSynchronously( delay ));
+    err = runRequestSynchronously( delay );
     TOOLS_ASSERTR( !err );
 }
 
@@ -3433,8 +3433,8 @@ ThreadingTestImpl::doSingleThreadTest( void )
     AutoDispose<> l_( lock_->enter() );
     TOOLS_ASSERTR( !flag2_ );
     l_.reset();
-    delay.reset( timing_->timer( 250 * TOOLS_NANOSECONDS_PER_MILLISECOND ));
-    err.reset( runRequestSynchronously( delay ));
+    delay = timing_->timer( 250 * TOOLS_NANOSECONDS_PER_MILLISECOND );
+    err = runRequestSynchronously( delay );
     TOOLS_ASSERTR( !err );
     cvar_->signal();
     thr->waitSync();

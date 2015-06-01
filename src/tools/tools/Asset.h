@@ -187,12 +187,12 @@ namespace tools {
         : AssetInstance
     {
         // Create a new per-instance instance for this asset type.  If no asynchronous work
-        // needs to be done, this can return NULL, which indicates the operation completed
+        // needs to be done, this can return nullptr, which indicates the operation completed
         // synchronously.
         virtual AutoDispose< Request > newInstance( AutoDispose< AssetInstance > & ) = 0;
         // Create a child for this asset, based on its name.  The implementation should not
         // track its children, that will be handled by the system internally.  If this returns
-        // NULL, the operation completed synchronously.
+        // nullptr, the operation completed synchronously.
         //
         // Note: there is no standard interface to enumerate all possible children of an asset
         // as this may be impossible or prohibitively expensive for some asset types.  IF this
@@ -221,10 +221,10 @@ namespace tools {
         typedef InterfaceT Type;
 
         AutoAsset( void ) throw()
-            : itf_( NULL )
+            : itf_( nullptr )
         {}
         AutoAsset( AutoAsset const & c ) throw()
-            : itf_( NULL )
+            : itf_( nullptr )
         {
             TOOLS_ASSERT( !c.asset_ );
             TOOLS_ASSERT( !c.subscription_ );
@@ -241,13 +241,13 @@ namespace tools {
             asset_.swap( r.asset_ );
             subscription_.release();
             r.subscription_.release();
-            itf_ = r.itf_ = NULL;
+            itf_ = r.itf_ = nullptr;
         }
         void swap( AutoAsset && r ) throw() {
             asset_.swap( r.asset_ );
             subscription_.release();
             r.subscription_.release();
-            itf_ = r.itf_ = NULL;
+            itf_ = r.itf_ = nullptr;
         }
         InterfaceT * get( void )
         {
@@ -276,7 +276,7 @@ namespace tools {
             TOOLS_ASSERT( !c.subscription_ );
             asset_.release();
             subscription_.release();
-            itf_ = NULL;
+            itf_ = nullptr;
             return *this;
         }
         AutoAsset< InterfaceT > & operator=( AutoAsset && r ) throw()
@@ -302,7 +302,7 @@ namespace tools {
     protected:
         void stateInvalid( void ) throw()
         {
-            itf_ = NULL;
+            itf_ = nullptr;
             if( !!asset_ ) {
                 detail::AssetState state = asset_->status();
                 if( ( state == tools::detail::AssetStateReloadable ) || ( state == tools::detail::AssetStateReady )) {

@@ -278,7 +278,7 @@ namespace tools {
   {
     AutoDispose< SimpleEnvironment > ret( new SimpleEnvironment( name ) );
     Environment * eret = ret.get();
-    lifetime.reset( static_cast< Disposable * >( ret.release() ));
+    lifetime = std::move( ret );
     return eret;
   }
 
@@ -290,7 +290,7 @@ namespace tools {
   {
     AutoDispose< TwoStageEnvironment > ret( new TwoStageEnvironment( name ) );
     Environment * eret = ret.get();
-    lifetime.reset( static_cast< Disposable * >( ret.release() ));
+    lifetime = std::move( ret );
     return eret;
   }
 }; // namespace tools

@@ -23,7 +23,7 @@ namespace {
     {
         // Disposable
         void dispose( void ) {
-            itf_ = NULL;
+            itf_ = nullptr;
         }
 
         // local methods
@@ -50,7 +50,7 @@ namespace {
 
     inline void
     setEnd( RegistryKey & key ) {
-        key.itf_ = NULL;
+        key.itf_ = nullptr;
     }
 
     struct RegistryEnumerationRoot
@@ -169,7 +169,7 @@ namespace tools {
         if( serviceName != nameOf< FactoryRegistry >() ) {
             registryFetch< RegistryEnumerationRoot >( serviceName )->post( i );
         }
-        return i;
+        return std::move(i);
     }
 
     void *
@@ -178,18 +178,18 @@ namespace tools {
         k.serviceName_ = serviceName;
         k.typeName_ = typeName;
         RegistryGlobal & r = registryMapGlobal();
-        FactoryRegistry * factory = NULL;
+        FactoryRegistry * factory = nullptr;
         if( void * service = r.peekService( k, &factory )) {
             return service;
         }
         if( !factory ) {
-            return NULL;
+            return nullptr;
         }
         void * newService;
         AutoDispose<> newServiceDisp( factory->link( &newService, typeName ));
         if( !newService ) {
             TOOLS_ASSERT( !newServiceDisp );
-            return NULL;
+            return nullptr;
         }
         TOOLS_ASSERT( !!newServiceDisp );
         return r.pokeFactoryService( k, newServiceDisp, newService, *factory );
@@ -212,7 +212,7 @@ static RegisterFactoryRegistry< AnyService, AnyServiceImpl > registerAnyService;
 //////////////////////////
 
 RegistryEnumerationRoot::RegistryEnumerationRoot( StringId const & )
-    : typeRoot_( NULL )
+    : typeRoot_( nullptr )
 {
 }
 
@@ -240,7 +240,7 @@ RegistryEnumerationRoot::post( RegistryKey * key )
 
 RegistryGlobal::RegistryGlobal( void )
 {
-    std::fill( services_, services_ + registryMapBucketsUsed, static_cast< RegistryKey * >( NULL ));
+    std::fill( services_, services_ + registryMapBucketsUsed, static_cast< RegistryKey * >( nullptr ));
 }
 
 RegistryGlobal::~RegistryGlobal( void )
@@ -263,7 +263,7 @@ RegistryGlobal::findService( RegistryKey const & key, RegistryKey * bucket )
         }
         bucket = i->nextMap_;
     }
-    return NULL;
+    return nullptr;
 }
 
 RegistryKey * volatile *
@@ -284,9 +284,9 @@ RegistryGlobal::peekService( RegistryKey const & key, FactoryRegistry ** factory
     if( RegistryKey * factoryReg = findService( factoryKey, *bucketOf( factoryKey ))) {
         *factory = static_cast< FactoryRegistry * >( factoryReg->itf_ );
     } else {
-        *factory = NULL;
+        *factory = nullptr;
     }
-    return NULL;
+    return nullptr;
 }
 
 void
@@ -320,7 +320,7 @@ RegistryGlobal::pokeFactoryService( RegistryKey const & key, AutoDispose<> & ser
     } else {
         // Insert a record as a factory created service
         detail::FactoryInstance * svc = new detail::FactoryInstance;
-        svc->insertion_.reset( i );
+        svc->insertion_ = i;
         svc->instance_ = std::move( serviceDisp );
         atomicPush( &factory.instances_, svc, &detail::FactoryInstance::next_ );
         // Add to the visiting list
@@ -363,7 +363,7 @@ AutoRegisterFactory::link( void ** bound, StringId const & name )
 {
     AutoRegisterImpl * impl = new AutoRegisterImpl( name );
     *bound = impl;
-    return impl;
+    return std::move(impl);
 }
 
 //////////////////
@@ -372,7 +372,7 @@ AutoRegisterFactory::link( void ** bound, StringId const & name )
 
 namespace tools {
     FactoryRegistry::FactoryRegistry( void )
-        : instances_( NULL )
+        : instances_( nullptr )
     {
         registryMapGlobalInit();
     }

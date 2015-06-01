@@ -13,7 +13,7 @@ namespace tools {
 
     template< typename PointerT >
     inline void setEnd( PointerT ** p ) {
-        *p = NULL;
+        *p = nullptr;
     }
 
     namespace detail {

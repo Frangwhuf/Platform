@@ -9,7 +9,7 @@ namespace tools {
        : Disposable
    {
        virtual AutoDispose< Request > timer( uint64, uint64 *, void * = TOOLS_RETURN_ADDRESS() ) = 0;
-       virtual uint64 eval( uint64 * = NULL ) = 0;
+       virtual uint64 eval( uint64 * = nullptr ) = 0;
    };
 
    namespace impl {

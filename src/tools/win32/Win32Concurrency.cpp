@@ -364,7 +364,7 @@ SimpleMonitor::enter(
 {
     if( tryOnly ) {
         return ( TryAcquireSRWLockExclusive( &lock_ )) ?
-            static_cast< SimpleMonitorUnlock * >( this ) : NULL;
+            static_cast< SimpleMonitorUnlock * >( this ) : nullptr;
     }
     AcquireSRWLockExclusive( &lock_ );
     return static_cast< SimpleMonitorUnlock * >( this );
@@ -403,8 +403,8 @@ SimpleConditionVar::wait( void )
     TOOLS_ASSERT( !!lockVal );
     TOOLS_ASSERT( !!lock );
 
-    *cvarMonitor = NULL;
-    lockVal->lock_ = NULL;
+    *cvarMonitor = nullptr;
+    lockVal->lock_ = nullptr;
 
     // Since condition variables users must tollerate spurrious wakeups, insert some to
     // prevent spurious drops (about 5 minutes).
@@ -479,7 +479,7 @@ SrwMonitor::enter(
     bool tryOnly )
 {
     if( tryOnly ) {
-        return ( TryAcquireSRWLockExclusive( &lock_ )) ? static_cast< SrwMonitorUnlock * >( this ) : NULL;
+        return ( TryAcquireSRWLockExclusive( &lock_ )) ? static_cast< SrwMonitorUnlock * >( this ) : nullptr;
     }
     AcquireSRWLockExclusive( &lock_ );
     return static_cast< SrwMonitorUnlock * >( this );
@@ -537,7 +537,7 @@ WinThread::WinThread(
     , waiters_( 0 )
 {
     DWORD id;
-    handle_ = CreateThread( NULL, 0, entry, this, 0, &id );
+    handle_ = CreateThread( nullptr, 0, entry, this, 0, &id );
     TOOLS_ASSERT(!!handle_);
     impl::SetThreadName( id, name.c_str() );
     atomicIncrement( &threadStackCount );
@@ -630,7 +630,7 @@ WinThreadAll::WinThreadAll(
     , numRunning_( 0 )
     , numThreads_( count )
 {
-    std::fill( threads_, threads_ + count, static_cast< HANDLE >( NULL ));
+    std::fill( threads_, threads_ + count, static_cast< HANDLE >( nullptr ));
 }
 
 WinThreadAll::~WinThreadAll( void )
@@ -659,7 +659,7 @@ WinThreadAll::start( void )
     DWORD id = 0;
     started_ = true;
     numRunning_ = numThreads_;
-    InitializeProcThreadAttributeList( NULL, 2, 0, &sz );
+    InitializeProcThreadAttributeList( nullptr, 2, 0, &sz );
     attribs = static_cast< LPPROC_THREAD_ATTRIBUTE_LIST >( alloca( sz ));
     for( unsigned i=0; i!=numThreads_; ++i ) {
         PROCESSOR_NUMBER proc;
@@ -671,9 +671,9 @@ WinThreadAll::start( void )
         GetNumaProcessorNode( static_cast< UCHAR >( i*parent_.numThreadAffinity_ ), &node );
         GetNumaNodeProcessorMask( node, &nodeMask );
         InitializeProcThreadAttributeList( attribs, 2, 0, &sz );
-        UpdateProcThreadAttribute( attribs, 0, PROC_THREAD_ATTRIBUTE_IDEAL_PROCESSOR, &proc, sizeof( PROCESSOR_NUMBER ), NULL, NULL );
-        UpdateProcThreadAttribute( attribs, 0, PROC_THREAD_ATTRIBUTE_PREFERRED_NODE, &node, sizeof( UCHAR ), NULL, NULL );
-        threads_[ i ] = CreateRemoteThreadEx( GetCurrentProcess(), NULL, 0, entry, this, CREATE_SUSPENDED, attribs, &id );
+        UpdateProcThreadAttribute( attribs, 0, PROC_THREAD_ATTRIBUTE_IDEAL_PROCESSOR, &proc, sizeof( PROCESSOR_NUMBER ), nullptr, nullptr );
+        UpdateProcThreadAttribute( attribs, 0, PROC_THREAD_ATTRIBUTE_PREFERRED_NODE, &node, sizeof( UCHAR ), nullptr, nullptr );
+        threads_[ i ] = CreateRemoteThreadEx( GetCurrentProcess(), nullptr, 0, entry, this, CREATE_SUSPENDED, attribs, &id );
         TOOLS_ASSERT( !!threads_[ i ] );
         // lock the thread to a particular node
         SetThreadAffinityMask( threads_[ i ], static_cast< DWORD_PTR >( nodeMask ));

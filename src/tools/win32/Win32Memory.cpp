@@ -213,7 +213,7 @@ namespace tools
         platformHugeAlloc(
             size_t size )
         {
-            void * ret = VirtualAlloc( NULL, size, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE );
+            void * ret = VirtualAlloc( nullptr, size, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE );
             if( ret ) {
                 outOfMemoryDie();
             }
@@ -236,7 +236,7 @@ namespace tools
     Affinity *
     staticServiceCacheInit( Affinity ***, Platform *** )
     {
-        static AffinityGlobal affinity(false, NULL);
+        static AffinityGlobal affinity(false, nullptr);
         return &affinity;
     }
 
@@ -251,7 +251,7 @@ namespace tools
 static Affinity &
 affinityGlobalBound( void )
 {
-    static AffinityGlobal globalBound_( true, NULL );
+    static AffinityGlobal globalBound_( true, nullptr );
     return globalBound_;
 }
 
@@ -275,13 +275,13 @@ enablePrivileges(
     if( !ret ) {
         return false;
     }
-    ret = LookupPrivilegeValue( NULL, SE_LOCK_MEMORY_NAME, &privs.Privileges[ 0 ].Luid );
+    ret = LookupPrivilegeValue( nullptr, SE_LOCK_MEMORY_NAME, &privs.Privileges[ 0 ].Luid );
     if( !ret ) {
         return false;
     }
     privs.PrivilegeCount = 1;
     privs.Privileges[ 0 ].Attributes = SE_PRIVILEGE_ENABLED;
-    ret = AdjustTokenPrivileges( token, FALSE, &privs, sizeof( TOKEN_PRIVILEGES ), NULL, NULL );
+    ret = AdjustTokenPrivileges( token, FALSE, &privs, sizeof( TOKEN_PRIVILEGES ), nullptr, nullptr );
     if( !!ret ) {
         DWORD err = GetLastError();
         if( err != ERROR_SUCCESS ) {
@@ -358,7 +358,7 @@ HeapInfo::popReserved( void )
     if( reservedUsed_ != 0 ) {
         return reserved_[ --reservedUsed_ ];
     }
-    return NULL;
+    return nullptr;
 }
 
 void
@@ -394,7 +394,7 @@ HeapInfo::map( void )
     while( !( site = popReserved() )) {
         // Yeah this is ugly.  Unpleasant lock manipulation.
         LeaveCriticalSection( &largePageLock_ );
-            site = VirtualAlloc( NULL, largePageSize_ * reservationUnits,
+            site = VirtualAlloc( nullptr, largePageSize_ * reservationUnits,
                 MEM_RESERVE, PAGE_NOACCESS );
             void * endPtr = reinterpret_cast< uint8 * >( site ) +
                 ( largePageSize_ * reservationUnits );
@@ -449,7 +449,7 @@ HeapInfoPoolProxy::HeapInfoPoolProxy( void )
     desc_.size_ = info_->largePageSize_;
     desc_.align_ = info_->largePageSize_;
     desc_.phase_ = 0U;
-    desc_.trace_ = NULL;
+    desc_.trace_ = nullptr;
 }
 
 Pool::Desc &
@@ -497,12 +497,12 @@ Win32Affinity::fork(
     impl::ResourceSample const & sample )
 {
     if( !trace_ ) {
-        static impl::ResourceSample global_( 0U, static_cast< void * >( NULL ), NULL );
+        static impl::ResourceSample global_( 0U, static_cast< void * >( nullptr ), nullptr );
         trace_ = impl::resourceTraceBuild( 1, global_ );
     }
     AffinityFork * ret = new AffinityFork( bound_, impl::resourceTraceBuild( 1, sample, trace_ ));
     *parent = ret;
-    return ret;
+    return std::move(ret);
 }
 
 Pool &

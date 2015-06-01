@@ -518,6 +518,23 @@ PhantomCloakLocal::realTimeTouch( void )
 #if TOOLS_UNIT_TEST
 
 namespace {
+    struct TestWeakling
+        : Weakling
+        , AllocStatic<>
+    {
+        TestWeakling(bool * d) : disposed_(d) {}
+
+        // Weakling
+        void dispose(void) override {
+            PhantomCloak & p(phantomLocal<PhantomUniversal>());
+            TOOLS_ASSERTR(p.isCloaked());
+            TOOLS_ASSERTR(!*disposed_);
+            *disposed_ = true;
+        }
+
+        bool * disposed_;
+    };
+
     struct TestPhantomElement
         : StandardPhantomSlistElement< TestPhantomElement, StandardPhantom< TestPhantomElement, AllocPool< TestPhantomElement >>>
     {
@@ -533,13 +550,26 @@ namespace {
     }
 };  // anonymous namespace
 
-void TestPhantomMapUpdateInsert( void )
+TOOLS_TEST_CASE("Weakling", [](Test & test)
+{
+    PhantomCloak & phantom(phantomLocal<PhantomUniversal>());
+    bool disposed = false;
+    AutoDispose<> & testCloak = test.cloak();
+    TestWeakling weakling(&disposed);
+    phantom.finalize(&weakling);
+    TOOLS_ASSERTR(!disposed);
+    testCloak = nullptr;
+    TOOLS_ASSERTR(disposed);
+    // Just in case the test environment needs a cloak for shutdown, let's give it a new one.
+    testCloak = phantomBindPrototype<PhantomUniversal>().select();
+});
+
+TOOLS_TEST_CASE("PhantomHashMap.update.inesrt", [](Test &)
 {
     PhantomHashMap< TestPhantomElement, uint64, PhantomUniversal, 1 > phMap;
     // Verify insertion doesn't remove items
     size_t i = 0;
     while( i < 10 ) {
-        AutoDispose<> cloak( phantomTryBindPrototype< PhantomUniversal >() );
         uint64 key = ( 2 * i ) + 1;
         phMap.find( key, [&]( TestPhantomElement const * ref )->void {
             TOOLS_ASSERTR( ref == nullptr );
@@ -552,7 +582,6 @@ void TestPhantomMapUpdateInsert( void )
     }
     i = 0;
     while( i < 10 ) {
-        AutoDispose<> cloak( phantomTryBindPrototype< PhantomUniversal >() );
         uint64 key = 2 * i;
         phMap.find( key, [&]( TestPhantomElement const * ref )->void {
             TOOLS_ASSERTR( ref == nullptr );
@@ -566,7 +595,6 @@ void TestPhantomMapUpdateInsert( void )
     // Validate the state of the map
     uint32 masks = 0U;
     uint32 maskAll = 0xFFFFFU;
-    AutoDispose<> cloak( phantomTryBindPrototype< PhantomUniversal >() );
     phMap.forEach( [&]( TestPhantomElement const & elem )->bool {
         uint32 mask = static_cast< uint32 >( 1U ) << elem.id_;
         TOOLS_ASSERTR( ( mask & masks ) == 0 );
@@ -575,17 +603,14 @@ void TestPhantomMapUpdateInsert( void )
     });
     TOOLS_ASSERTR( maskAll == masks );
     phMap.clear();
-}
+});
 
-TOOLS_UNIT_TEST_FUNCTION( TestPhantomMapUpdateInsert );
-
-void TestPhantomMapUpdateInsertDup( void )
+TOOLS_TEST_CASE("PhantomHashMap.update.insert.duplicate", [](Test &)
 {
     PhantomHashMap< TestPhantomElement, uint64, PhantomUniversal, 1> phMap;
     // Verify insertion doesn't remove items
     size_t i = 0;
     while( i < 12 ) {
-        AutoDispose<> cloak( phantomTryBindPrototype< PhantomUniversal >() );
         uint64 key = i;
         phMap.find( key, [&]( TestPhantomElement const * ref )->void {
             TOOLS_ASSERTR( ref == nullptr );
@@ -599,7 +624,6 @@ void TestPhantomMapUpdateInsertDup( void )
     // Replace all elements with new ones
     i = 0;
     while( i < 12 ) {
-        AutoDispose<> cloak( phantomTryBindPrototype< PhantomUniversal >() );
         uint64 key = i;
         phMap.find( key, [&]( TestPhantomElement const * ref )->void {
             TOOLS_ASSERTR( ref != nullptr );
@@ -613,7 +637,6 @@ void TestPhantomMapUpdateInsertDup( void )
     // Validate the state of the map
     uint32 masks = 0U;
     uint32 maskAll = 0xFFFU;
-    AutoDispose<> cloak( phantomTryBindPrototype< PhantomUniversal >() );
     phMap.forEach( [&]( TestPhantomElement const & elem )->bool {
         uint32 mask = static_cast< uint32 >( 1U ) << elem.id_;
         TOOLS_ASSERTR( ( mask & masks ) == 0 );
@@ -622,16 +645,13 @@ void TestPhantomMapUpdateInsertDup( void )
     });
     TOOLS_ASSERTR( maskAll == masks );
     phMap.clear();
-}
+});
 
-TOOLS_UNIT_TEST_FUNCTION( TestPhantomMapUpdateInsertDup );
-
-void TestPhantomMapUpdateRemove( void )
+TOOLS_TEST_CASE("PhantomHashMap.update.remove", [](Test &)
 {
     PhantomHashMap< TestPhantomElement, uint64, PhantomUniversal, 1> phMap;
     size_t i = 0;
     while( i < 12 ) {
-        AutoDispose<> cloak( phantomTryBindPrototype< PhantomUniversal >() );
         uint64 key = i;
         phMap.find( key, [&]( TestPhantomElement const * ref )->void {
             TOOLS_ASSERTR( ref == nullptr );
@@ -645,7 +665,6 @@ void TestPhantomMapUpdateRemove( void )
     // Make 2 passes, should observe no difference
     size_t j = 2;
     while( j-- > 0 ) {
-        AutoDispose<> cloak( phantomTryBindPrototype< PhantomUniversal >() );
         i = 0;
         while( i < 6 ) {
             uint64 key = i * 2;
@@ -664,10 +683,7 @@ void TestPhantomMapUpdateRemove( void )
         });
         TOOLS_ASSERTR( maskAll == masks );
     }
-    AutoDispose<> cloak( phantomTryBindPrototype< PhantomUniversal >() );
     phMap.clear();
-}
-
-TOOLS_UNIT_TEST_FUNCTION( TestPhantomMapUpdateRemove );
+});
 
 #endif /* TOOLS_UNIT_TEST */

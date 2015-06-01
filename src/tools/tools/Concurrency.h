@@ -2402,7 +2402,9 @@ TOOLS_WARNINGS_RESTORE
         struct Reference
             : HostT
             , tools::Disposable
-        {};
+        {
+			TOOLS_FORCE_INLINE Reference(void) {}
+		};
 
         virtual tools::AutoDispose< Reference > ref( void ) const throw() = 0;
     };
@@ -2417,11 +2419,11 @@ TOOLS_WARNINGS_RESTORE
         , AllocT
     {
         StandardReferenced( void )
-            : refs_( 1 )
+            : refs_( 1U )
         {}
         ~StandardReferenced( void )
         {
-            TOOLS_ASSERT( refs_ == 0 );
+            TOOLS_ASSERT( refs_ == 0U );
         }
         void
         dispose( void )

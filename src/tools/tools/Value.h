@@ -235,7 +235,7 @@ namespace tools {
   //    ValueT * next( void )
   //    {
   //      Value * v = iter_->next();
-  //      if( !v ) { return NULL; }
+  //      if( !v ) { return nullptr; }
   //      ret_ = interpret_cast< ValueT >( *v );
   //      return &ret_;
   //    }

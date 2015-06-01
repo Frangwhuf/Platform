@@ -102,10 +102,10 @@ TimerReq::start()
 TimerQueueImpl::TimerQueueImpl(
     Thunk const & thunk )
     : thunk_( thunk )
-    , pending_( NULL )
-    , claim_( *this, 0, NULL, NULL )
+    , pending_( nullptr )
+    , claim_( *this, 0, nullptr, nullptr )
 {
-    claim_.next_ = NULL;
+    claim_.next_ = nullptr;
     pending_ = &claim_;
 }
 
@@ -116,16 +116,16 @@ TimerQueueImpl::~TimerQueueImpl( void )
     while( !!pending_ && pending_ != &claim_ ) {
         TimerReq * toCancel = pending_;
         pending_ = toCancel->next_;
-        toCancel->next_ = NULL;
+        toCancel->next_ = nullptr;
         if( !err ) {
-            err.reset( errorCancelNew() );
+            err = errorCancelNew();
         }
         toCancel->finish( *err );
     }
     // Cancel timers from those most about to fire, to those more distant.
     std::for_each(sleeping_.rbegin(), sleeping_.rend(), [&]( TimerReq * r )->void {
         if( !err ) {
-            err.reset( errorCancelNew() );
+            err = errorCancelNew();
         }
         r->finish( *err );
     });
@@ -184,7 +184,7 @@ TimerQueueImpl::eval(
         // if( ( activateTime - lastMemDump ) > memDump ) {
         //     // TODO: do a memory dump
         // }
-    } while( atomicCas< TimerReq *, TimerReq * >( &pending_, &claim_, NULL ) != &claim_ );
+    } while( atomicCas< TimerReq *, TimerReq * >( &pending_, &claim_, nullptr ) != &claim_ );
     // By the time we get here, we have computed the time until next execution.
     if( !!napTime ) {
         *napTime = ( now + retry );
@@ -201,7 +201,7 @@ TimerQueueImpl::draw(
         for( TimerReq * queueNext; !!queue && queue != &claim_; queue = queueNext ) {
             queueNext = queue->next_;
             // This needs to be reset immediately
-            queue->next_ = NULL;
+            queue->next_ = nullptr;
             sleeping_.push_back( queue );
             added = true;
         }

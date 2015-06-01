@@ -1257,7 +1257,7 @@ TestAssetRoot::load( StringId const & relpath ) throw()
         atomicRef( &refs_ );
         AutoDispose< AssetLoader > loader( new NullLoaderImpl() );
         AutoDispose< Asset > parent( this );
-        root_.reset( new InternalAssetSingleton( parent, loader, name(), factory_ ));
+        root_ = new InternalAssetSingleton( parent, loader, name(), factory_ );
         TOOLS_ASSERT( !!root_ );
     }
     return root_->load( relpath );
@@ -1333,7 +1333,7 @@ AutoDispose< Request >
 TestAssetSingleton::newInstance( AutoDispose< AssetInstance > & inst )
 {
     // TODO: sometimes return a request, sometimes return not this
-    inst.reset( this );
+    inst = this;
     return static_cast< Request * >( nullptr );
 }
 

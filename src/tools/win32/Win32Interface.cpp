@@ -65,7 +65,7 @@ detail::platformSymbolNameFromAddress(
     // This is lock protected by the user, so we don't need to worry about that here.
     if( !symbolInit ) {
         SymSetOptions( SYMOPT_DEFERRED_LOADS );
-        SymInitialize( GetCurrentProcess(), NULL, TRUE );
+        SymInitialize( GetCurrentProcess(), nullptr, TRUE );
         // Bypass allocation checking for this structure
         symbolInfo = static_cast< SYMBOL_INFO * >( HeapAlloc( GetProcessHeap(), 0,
             sizeof( SYMBOL_INFO ) + sizeof( char[ 256 ])));
@@ -73,7 +73,7 @@ detail::platformSymbolNameFromAddress(
     }
     symbolInfo->SizeOfStruct = sizeof( SYMBOL_INFO );
     symbolInfo->MaxNameLen = 255;
-    if( !SymFromAddr( GetCurrentProcess(), (DWORD64)(size_t)site, NULL, symbolInfo )) {
+    if( !SymFromAddr( GetCurrentProcess(), (DWORD64)(size_t)site, nullptr, symbolInfo )) {
         return StringIdNull();
     }
     return StringId( symbolInfo->Name, numeric_cast<sint32>( symbolInfo->NameLen ) );
