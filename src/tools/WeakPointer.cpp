@@ -267,9 +267,9 @@ void
 PhantomSequenceLocal::enter( void )
 {
     ++entries_;
-    atomicTryUpdate( &root_->root_, [=]( PhantomSequenceRef * ref )->bool {
-        cloakSeq_ = ref->next_;
-        ++ref->refs_;
+    atomicTryUpdate( &root_->root_, [=]( PhantomSequenceRef & ref )->bool {
+        cloakSeq_ = ref.next_;
+        ++ref.refs_;
         return true;
     });
 }
@@ -279,11 +279,11 @@ PhantomSequenceLocal::exit(
     bool marshal )
 {
     PhantomSequence * start;
-    atomicTryUpdate( &root_->root_, [=, &start]( PhantomSequenceRef * ref )->bool {
-        start = ( ref->next_ != cloakSeq_ ) ? ref->current_ : nullptr;
-        ref->live_ = false;
-        TOOLS_ASSERT( ref->refs_ > 0U );
-        --ref->refs_;
+    atomicTryUpdate( &root_->root_, [=, &start]( PhantomSequenceRef & ref )->bool {
+        start = ( ref.next_ != cloakSeq_ ) ? ref.current_ : nullptr;
+        ref.live_ = false;
+        TOOLS_ASSERT( ref.refs_ > 0U );
+        --ref.refs_;
         return true;
     });
     uint32 uncloakSeq = cloakSeq_;
@@ -303,21 +303,21 @@ PhantomSequenceLocal::touch(
     TOOLS_ASSERT( entries_ > 0U );
     PhantomSequence * start;
     uint32 recloakSeq;
-    atomicTryUpdate( &root_->root_, [=, &start, &recloakSeq]( PhantomSequenceRef * ref )->bool {
-        recloakSeq = ref->next_;
-        TOOLS_ASSERT( ref->refs_ > 0U );
+    atomicTryUpdate( &root_->root_, [=, &start, &recloakSeq]( PhantomSequenceRef & ref )->bool {
+        recloakSeq = ref.next_;
+        TOOLS_ASSERT( ref.refs_ > 0U );
         if( recloakSeq == cloakSeq_ ) {
             start = nullptr;
-            if( !ref->live_ ) {
+            if( !ref.live_ ) {
                 // no change
                 return false;
             }
         } else {
             // If we read a real value we must modify the AtomicAny to guarantee it wasn't torn during
             // transfer.
-            start = ref->current_;
+            start = ref.current_;
         }
-        ref->live_ = false;
+        ref.live_ = false;
         return true;
     });
     uint32 uncloakSeq = cloakSeq_;
@@ -338,9 +338,9 @@ PhantomSequenceLocal::post(
     }
     TOOLS_ASSERT( entries_ > 0U );
     PhantomSequence * seqPost;
-    atomicTryUpdate( &root_->root_, [=, &seqPost]( PhantomSequenceRef * ref )->bool {
-        if( ref->live_ && ( ref->next_ != cloakSeq_ )) {
-            seqPost = ref->current_;
+    atomicTryUpdate( &root_->root_, [=, &seqPost]( PhantomSequenceRef & ref )->bool {
+        if( ref.live_ && ( ref.next_ != cloakSeq_ )) {
+            seqPost = ref.current_;
             // Because we are reading a > 64-bit AtomicAny<...>, to guarentee no tearing, we must do the update.
             return true;
         }
@@ -349,12 +349,12 @@ PhantomSequenceLocal::post(
             stash_ = new PhantomSequence();
         }
         seqPost = stash_;
-        seqPost->next_ = ref->current_;
-        seqPost->refs_ = ref->refs_;
-        seqPost->sequence_ = ref->next_;
-        ref->live_ = true;
-        ++ref->next_;  // overflow doesn't matter for this
-        ref->current_ = seqPost;
+        seqPost->next_ = ref.current_;
+        seqPost->refs_ = ref.refs_;
+        seqPost->sequence_ = ref.next_;
+        ref.live_ = true;
+        ++ref.next_;  // overflow doesn't matter for this
+        ref.current_ = seqPost;
         return true;
     });
     if( seqPost == stash_ ) {

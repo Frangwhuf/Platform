@@ -800,11 +800,11 @@ namespace tools {
         }
         TOOLS_FORCE_INLINE void join(Completion const & completion) {
             auto add = new Node(completion);
-            if (!atomicTryUpdate(&pending_, [add](Node ** node)->bool {
-                bool ret = (*node != reinterpret_cast<Node *>(completed));
+            if (!atomicTryUpdate(&pending_, [add](Node *& node)->bool {
+                bool ret = (node != reinterpret_cast<Node *>(completed));
                 if (ret) {
-                    add->next_ = *node;
-                    *node = add;
+                    add->next_ = node;
+                    node = add;
                 }
                 return ret;
             })) {

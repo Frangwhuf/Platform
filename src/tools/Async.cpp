@@ -332,9 +332,9 @@ void
 MultiRequestOwnerImpl::start(
     AutoDispose<Request> && request)
 {
-    atomicTryUpdate(&state_, [](State * old)->bool {
-        TOOLS_ASSERT(!old->closed_);
-        ++old->running_;
+    atomicTryUpdate(&state_, [](State & old)->bool {
+        TOOLS_ASSERT(!old.closed_);
+        ++old.running_;
         return true;
     });
     Request & req = *request;
@@ -348,10 +348,10 @@ MultiRequestOwnerImpl::maybeStart(
     AutoDispose<Request> && request)
 {
     bool stopped = false;
-    atomicTryUpdate(&state_, [&stopped](State * old)->bool {
-        stopped = old->closed_;
+    atomicTryUpdate(&state_, [&stopped](State & old)->bool {
+        stopped = old.closed_;
         if (!stopped) {
-            ++old->running_;
+            ++old.running_;
         }
         return true;
     });
@@ -369,10 +369,10 @@ AutoDispose<Request>
 MultiRequestOwnerImpl::stop(void)
 {
     bool fire = false;
-    atomicTryUpdate(&state_, [&fire](State * old)->bool {
-        TOOLS_ASSERT(!old->closed_);
-        old->closed_ = true;
-        fire = (old->running_ == 0U);
+    atomicTryUpdate(&state_, [&fire](State & old)->bool {
+        TOOLS_ASSERT(!old.closed_);
+        old.closed_ = true;
+        fire = (old.running_ == 0U);
         return true;
     });
     if (fire) {
@@ -398,10 +398,10 @@ MultiRequestOwnerImpl::done(
 {
     setEnd(*entry);
     bool extract = false;
-    atomicTryUpdate(&state_, [&extract](State * old)->bool {
-        ++old->doneCount_;
-        if ((extract = (old->doneCount_ >= extractInterval))) {
-            old->doneCount_ = 0;
+    atomicTryUpdate(&state_, [&extract](State & old)->bool {
+        ++old.doneCount_;
+        if ((extract = (old.doneCount_ >= extractInterval))) {
+            old.doneCount_ = 0;
         }
         return true;
     });
@@ -409,10 +409,10 @@ MultiRequestOwnerImpl::done(
         list_.extract(false);
     }
     bool fire = false;
-    atomicTryUpdate(&state_, [&fire](State * old)->bool {
-        TOOLS_ASSERT(old->running_ != 0U);
-        --old->running_;
-        fire = ((old->running_ == 0U) && old->closed_);
+    atomicTryUpdate(&state_, [&fire](State & old)->bool {
+        TOOLS_ASSERT(old.running_ != 0U);
+        --old.running_;
+        fire = ((old.running_ == 0U) && old.closed_);
         return true;
     });
     if (fire) {

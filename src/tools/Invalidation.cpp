@@ -218,10 +218,10 @@ PubBase::newSubscription( Thunk const & thunk, Thunk const & dead )
                     current->dead_ = dead;
 					atomicIncrement( &size_ );
                     // clear the initializing flag, we should be the only one modifying this now
-                    atomicTryUpdate( &current->flags_, []( unsigned * prev )->bool {
-                        bool ret = (( *prev & SubscrItem::InitializingFlag ) != 0U );
+                    atomicTryUpdate( &current->flags_, []( unsigned & prev )->bool {
+                        bool ret = (( prev & SubscrItem::InitializingFlag ) != 0U );
                         if( ret ) {
-                            *prev = *prev & ~SubscrItem::InitializingFlag;
+                            prev = prev & ~SubscrItem::InitializingFlag;
                         }
                         return ret;
                     });

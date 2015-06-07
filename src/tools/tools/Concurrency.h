@@ -21,19 +21,25 @@ namespace tools {
         template< size_t N, size_t pow >
         struct AtomicRoundPower< N, pow, false >
         {
-            static const size_t power_ = tools::impl::AtomicRoundPower< N, ( 2 * pow ), ( N <= ( 2 * pow )) >::power_;
+            enum : size_t {
+                power_ = tools::impl::AtomicRoundPower< N, (2 * pow), (N <= (2 * pow)) >::power_
+            };
         };
 
         template< size_t N, size_t pow >
         struct AtomicRoundPower< N, pow, true >
         {
-            static const size_t power_ = pow;
+            enum : size_t {
+                power_ = pow
+            };
         };
 
         template< size_t N >
         struct AtomicPowerOf2
         {
-            static const size_t power_ = tools::impl::AtomicRoundPower< N, 1, ( N <= 1 ) >::power_;
+            enum : size_t {
+                power_ = tools::impl::AtomicRoundPower< N, 1, (N <= 1) >::power_
+            };
         };
 
         template< int width >
@@ -2060,6 +2066,8 @@ TOOLS_WARNINGS_RESTORE
     // Continue to compute and try to apply a new value until it takes.
     // The passed in functor should take TypeT (ref, const, const ref)
     // as a parameter and return the new value based on that.
+    //
+    //   [....](TypeT &)->TypeT
     template< typename TypeT, typename FuncT >
     TOOLS_FORCE_INLINE TypeT atomicUpdate( TypeT volatile * const site, FuncT && f )
     {
@@ -2078,13 +2086,15 @@ TOOLS_WARNINGS_RESTORE
     // and the functor should return true. If not, the functor should
     // return false. The second variation returns the old/previous
     // value.
+    //
+    //   [....](TypeT &)->bool
     template< typename TypeT, typename FuncT >
     TOOLS_FORCE_INLINE bool const atomicTryUpdate( TypeT volatile * const site, FuncT && f )
     {
         for( ;; ) {
             TypeT prevValue = *site;
             TypeT nextValue = prevValue;
-            bool ret = f( &nextValue );
+            bool ret = f( nextValue );
             if( ret ) {
                 if( ::tools::atomicCas( site, prevValue, nextValue ) != prevValue ) {
                     continue;
@@ -2319,7 +2329,7 @@ TOOLS_WARNINGS_RESTORE
             for( ;; ) {
                 PairT prevValue( ::tools::atomicRead( &any_.bits_ ));
                 PairT nextValue( prevValue );
-                bool ret = f( &nextValue.any_ );
+                bool ret = f( nextValue.any_ );
                 if( ret ) {
                     if( ::tools::atomicCas( &any_.bits_, prevValue.bits_, nextValue.bits_ ) != prevValue.bits_ ) {
                         continue;
@@ -2334,7 +2344,7 @@ TOOLS_WARNINGS_RESTORE
             for( ;; ) {
                 PairT prevValue( &any_.bits_ );
                 PairT nextValue( prevValue );
-                bool ret = f( &nextValue.any_ );
+                bool ret = f( nextValue.any_ );
                 if( ret ) {
                     if( ::tools::atomicCas( &any_.bits_, prevValue.bits_, nextValue.bits_ ) != prevValue.bits_ ) {
                         continue;

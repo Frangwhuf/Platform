@@ -143,22 +143,22 @@ namespace tools
             // Values returned via arguments are only valid when true is returned.
             bool claimExtract(bool rescan, bool & refClaimParity, bool & refCanDispose, bool & refCanDisposeLinger) {
                 bool claim = false;
-                atomicTryUpdate(&refs_, [&](AtomicListRefs * refOld)->bool {
+                atomicTryUpdate(&refs_, [&](AtomicListRefs & refOld)->bool {
                     typedef tools::detail::AtomicListRefs::ClaimState ClaimState;
-                    if (refOld->extractClaimed_ != ClaimState::UNCLAIMED) {
+                    if (refOld.extractClaimed_ != ClaimState::UNCLAIMED) {
                         claim = false;
-                        if (rescan && (refOld->extractClaimed_ == ClaimState::CLAIMED)) {
-                            refOld->extractClaimed_ = ClaimState::CLAIMEDMOREWORK;
+                        if (rescan && (refOld.extractClaimed_ == ClaimState::CLAIMED)) {
+                            refOld.extractClaimed_ = ClaimState::CLAIMEDMOREWORK;
                             return true;
                         } else {
                             return false;
                         }
                     }
                     claim = true;
-                    refClaimParity = refOld->parity_;
-                    refCanDispose = (refOld->readRefs_ == 0U);
-                    refCanDisposeLinger = (refOld->readLingerRefs_ == 0U);
-                    refOld->extractClaimed_ = ClaimState::CLAIMED;
+                    refClaimParity = refOld.parity_;
+                    refCanDispose = (refOld.readRefs_ == 0U);
+                    refCanDisposeLinger = (refOld.readLingerRefs_ == 0U);
+                    refOld.extractClaimed_ = ClaimState::CLAIMED;
                     return true;
                 });
                 return claim;
@@ -172,15 +172,15 @@ namespace tools
             // matching reference counts are > 0. This is why we can successfully unclaim but still be dirty.
             bool unclaim(bool hasExtracted, bool hasExtractedLinger, bool & refCanDispose, bool & refCanDisposeLinger, bool & refStillDirty) {
                 bool unclaimed = false;
-                atomicTryUpdate(&refs_, [&](AtomicListRefs * refOld)->bool {
+                atomicTryUpdate(&refs_, [&](AtomicListRefs & refOld)->bool {
                     typedef tools::detail::AtomicListRefs::ClaimState ClaimState;
-                    TOOLS_ASSERT(refOld->extractClaimed_ != ClaimState::UNCLAIMED);
+                    TOOLS_ASSERT(refOld.extractClaimed_ != ClaimState::UNCLAIMED);
                     unclaimed = false;
-                    refCanDispose = (hasExtracted && (refOld->readRefs_ == 0U));
-                    refCanDisposeLinger = (hasExtractedLinger && (refOld->readLingerRefs_ == 0U));
-                    if (refOld->extractClaimed_ == ClaimState::CLAIMEDMOREWORK) {
+                    refCanDispose = (hasExtracted && (refOld.readRefs_ == 0U));
+                    refCanDisposeLinger = (hasExtractedLinger && (refOld.readLingerRefs_ == 0U));
+                    if (refOld.extractClaimed_ == ClaimState::CLAIMEDMOREWORK) {
                         // Loop again, extract more
-                        refOld->extractClaimed_ = ClaimState::CLAIMED;
+                        refOld.extractClaimed_ = ClaimState::CLAIMED;
                         return true;
                     }
                     if (refCanDispose || refCanDisposeLinger) {
@@ -189,14 +189,14 @@ namespace tools
                     }
                     unclaimed = true;
                     // Looks like we might be able to unclaim!
-                    refOld->extractClaimed_ = ClaimState::UNCLAIMED;
-                    if (hasExtracted && (refOld->readRefs_ > 0U) && (refOld->readLingerRefs_ == 0U)) {
+                    refOld.extractClaimed_ = ClaimState::UNCLAIMED;
+                    if (hasExtracted && (refOld.readRefs_ > 0U) && (refOld.readLingerRefs_ == 0U)) {
                         TOOLS_ASSERT(!hasExtractedLinger);
                         // There exist concurrent readers preventing us from disposing the extracted elements,
                         // however the 'linger slot' is available. So copy those read references of to the
                         // 'linger slot'.
-                        refOld->parity_ = !refOld->parity_;
-                        refOld->readLingerRefs_ = refOld->readRefs_;
+                        refOld.parity_ = !refOld.parity_;
+                        refOld.readLingerRefs_ = refOld.readRefs_;
                         refStillDirty = true;
                     } else {
                         // We're still dirty if another slot is not empty. Scan again at another time.
@@ -286,9 +286,9 @@ namespace tools
             bool parity = states_.refReader();
             // The tail root is the extent we've observed.
             AnyT * tail = nullptr;
-            atomicTryUpdate(&roots_[root], [&](AnyT ** old)->bool {
-                AnyT * newRoot = *old;
-                tail = *old;
+            atomicTryUpdate(&roots_[root], [&](AnyT *& old)->bool {
+                AnyT * newRoot = old;
+                tail = old;
                 bool ret = func(&newRoot);
                 if (ret) {
                     TOOLS_ASSERT(!!newRoot);
@@ -325,13 +325,13 @@ namespace tools
             for (auto i = 0U; i != rootsUsed; ++i) {
                 // Handle the root element, which may race with an insertion.
                 AnyT * rootExtract = nullptr;
-                while (atomicTryUpdate(&roots_[i], [&](AnyT ** refRoot)->bool {
-                    rootExtract = *refRoot;
+                while (atomicTryUpdate(&roots_[i], [&](AnyT *& refRoot)->bool {
+                    rootExtract = refRoot;
                     bool ret = !!rootExtract;
                     if (ret) {
                         ret = isEnd(*rootExtract);
                         if (ret) {
-                            *refRoot = *atomicLinkOf<LinkRoleNext>(*rootExtract);
+                            refRoot = *atomicLinkOf<LinkRoleNext>(*rootExtract);
                         }
                     }
                     return ret;

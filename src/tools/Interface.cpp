@@ -405,19 +405,19 @@ impl::resourceTraceBuild(
     ResourceTraceImpl * foundRoot;
     // Keep track of this in case we're retrying
     ResourceTraceImpl * allocatedRoot = nullptr;
-    atomicTryUpdate( &resourceTraces_[ hash % resourceTraceTableSize ], [ =, &foundRoot, &allocatedRoot ]( ResourceTraceImpl ** ref )->bool {
+    atomicTryUpdate( &resourceTraces_[ hash % resourceTraceTableSize ], [ =, &foundRoot, &allocatedRoot ]( ResourceTraceImpl *& ref )->bool {
         if( TOOLS_UNLIKELY( !!allocatedRoot )) {
             delete allocatedRoot;
             allocatedRoot = nullptr;
         }
-        foundRoot = resourceSampleBucketPeek( interval, sample, *ref, target );
+        foundRoot = resourceSampleBucketPeek( interval, sample, ref, target );
         if( !!foundRoot ) {
             return false;
         }
         allocatedRoot = new ResourceTraceImpl( interval, sample, target );
-        allocatedRoot->next_ = *ref;
+        allocatedRoot->next_ = ref;
         foundRoot = allocatedRoot;
-        *ref = allocatedRoot;
+        ref = allocatedRoot;
         return true;
     });
     return foundRoot;

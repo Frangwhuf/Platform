@@ -3696,9 +3696,9 @@ MemoryDumpTask::checkUsage( uint64 curTime )
     if( nesting_ > 0 ) {
         return;  // already spawned
     }
-    if( !!atomicTryUpdate( &lastDumpNs_, [=]( uint64 * ref )->bool {
-            if( curTime >= ( *ref + dumpIntervalNs_ )) {
-                *ref = impl::getHighResTime();
+    if( !!atomicTryUpdate( &lastDumpNs_, [=]( uint64 & ref )->bool {
+            if( curTime >= ( ref + dumpIntervalNs_ )) {
+                ref = impl::getHighResTime();
                 return true;
             }
             return false;
@@ -3707,15 +3707,15 @@ MemoryDumpTask::checkUsage( uint64 curTime )
         return;
     }
     // Check for new high water mark for memory.
-    if( !!atomicTryUpdate( &lastDumpBytes_, []( uint64 * numBytes )->bool {
+    if( !!atomicTryUpdate( &lastDumpBytes_, []( uint64 & numBytes )->bool {
             // numBytes is the old value.  Here we compute a new desired value and return true.  False,
             // if there is no need to dump.
             uint64 cur = static_cast< uint64 >( getTotalTrackedMemory() ) /* TODO: + platformUntrackedMemory()*/;
-            uint64 lastSize = *numBytes;
+            uint64 lastSize = numBytes;
             uint64 thresh = std::min( lastSize + ( lastSize >> 3 ), lastSize + ( 512 * 1024 * 1024 ));
             bool run = ( cur >= thresh ) && ( cur >= ( 1024ULL * 1024 * 1024 ));
             if( run ) {
-                *numBytes = cur;
+                numBytes = cur;
             }
             return run;
         })) {

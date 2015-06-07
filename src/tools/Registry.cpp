@@ -303,14 +303,14 @@ RegistryGlobal::pokeFactoryService( RegistryKey const & key, AutoDispose<> & ser
     i->itf_ = service;
     // Race to insert
     RegistryKey * ret;
-    atomicTryUpdate( bucketOf( key ), [&]( RegistryKey ** ref )->bool {
-        if( RegistryKey * existing = findService( key, *ref )) {
+    atomicTryUpdate( bucketOf( key ), [&]( RegistryKey *& ref )->bool {
+        if( RegistryKey * existing = findService( key, ref )) {
             ret = existing;
             return false;
         }
         ret = i;
-        i->nextMap_ = *ref;
-        *ref = i;
+        i->nextMap_ = ref;
+        ref = i;
         return true;
     });
     if( ret != i ) {
