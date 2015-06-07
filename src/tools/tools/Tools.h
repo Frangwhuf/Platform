@@ -316,11 +316,13 @@ namespace tools {
   struct Build
   {
       // Should always be a const expression
+      enum : bool {
 #ifdef TOOLS_DEBUG
-      static const bool isDebug_ = true;
+          isDebug_ = true,
 #else // TOOLS_DEBUG
-      static const bool isDebug_ = false;
+          isDebug_ = false,
 #endif // TOOLS_DEBUG
+      };
   };
 
 #ifndef DOXYGEN_SKIP

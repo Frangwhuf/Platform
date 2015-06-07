@@ -48,6 +48,10 @@ namespace {
     struct VmemPool
         : Pool
     {
+        enum : size_t {
+            reservationUnits = 32, // Reserve 32 units at a time
+        };
+
         VmemPool( void );
         ~VmemPool( void );
         VmemPool( VmemPool const & ) = delete;
@@ -69,8 +73,6 @@ namespace {
 
         size_t largePageSize_;
         Pool::Desc desc_;
-        // Reserve 32 units at a time
-        static const size_t reservationUnits = 32;
         // Complete set of reservations we'll free at shutdown
         std::vector< void * > addrs_;
         unsigned volatile largePagesAllocated_;

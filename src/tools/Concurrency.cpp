@@ -319,6 +319,11 @@ namespace {
 
 	struct TaskLocalQueue
 	{
+        enum : size_t {
+            spawnsPreCacheMax = 16,
+            spawnsPreCacheTarget = 8, // Target number of pre-cache items
+        };
+
 		TaskLocalQueue( TaskLocalStat * );
 		~TaskLocalQueue( void );
 
@@ -343,9 +348,6 @@ namespace {
 		// Get the full chain of 'queue all's
 		Task * popQueueAll( void );
 
-		static const size_t spawnsPreCacheMax = 16;
-		// Target number of pre-cache items
-		static const size_t spawnsPreCacheTarget = 8;
 		TaskLocalStat *	stat_;
 		// This is managed lock-free.  Any task can remove, only the local
 		// thread adds.
@@ -373,6 +375,10 @@ namespace {
 
 	struct OrderedTasksSet
 	{
+        enum : size_t {
+		    numBuckets = 64, // Items are only added to this array, never removed or changed.
+        };
+
 		OrderedTasksSet( void );
 		~OrderedTasksSet( void );
 
@@ -380,8 +386,6 @@ namespace {
 		void push(unsigned, Task *);
 		Task * pop( void );
 
-		// Items are only added to this array, never removed or changed.
-		static const size_t numBuckets = 64;
 		OrderedTasks * volatile tasks_[ numBuckets ];
 		// The next bucket to look into for a pop.
 		unsigned nextBucket_;
@@ -413,8 +417,11 @@ namespace {
 
     struct TaskThreadStats
     {
+        enum : size_t {
+            maxItems = 40000,
+        };
+
         typedef std::vector< WorkDoneItem, AllocatorAffinity< WorkDoneItem >> WorkDoneVec;
-        static const size_t maxItems = 40000;
 
         TaskThreadStats( bool );
         void addTask( WorkDoneItem const & );
@@ -439,6 +446,10 @@ namespace {
 		, Notifiable< TaskSchedImpl >
 		, Completable< TaskSchedImpl >
 	{
+        enum : uint64 {
+            kickTimeout = 628ULL * TOOLS_NANOSECONDS_PER_MILLISECOND,  // 2pi 100 milliseconds
+        };
+
 		typedef std::vector< std::unique_ptr< TaskLocalQueue >, AllocatorAffinity< std::unique_ptr< TaskLocalQueue >>> Queues;
 
 		TaskSchedImpl( Environment & );
@@ -466,8 +477,6 @@ namespace {
         // TODO: These may no longer be needed
 		void notifyKick( Error * );
 		void preIdle( void );
-
-		static const uint64_t kickTimeout = 628ULL * TOOLS_NANOSECONDS_PER_MILLISECOND;  // 2pi 100 milliseconds
 
 		Environment & env_;
 		Threading & innerScheduler_;
@@ -592,6 +601,12 @@ namespace {
 	struct TaskAll
 		: StandardManualRequest< TaskAll, AllocTail< TaskAllEntry, Temporal >>
 	{
+        enum : int {
+		    crackRefs = 0U,
+		    crackEnters = 1U,
+		    crackExits = 2U,
+        };
+
 		union crack {
 			unsigned packed_;
 			uint8_t unpacked_[ 4 ];
@@ -607,10 +622,6 @@ namespace {
 		void execute( void );
 
 		static_assert( sizeof( crack ) == sizeof( unsigned ), "Bad union layout" );
-
-		static const int crackRefs = 0U;
-		static const int crackEnters = 1U;
-		static const int crackExits = 2U;
 
 		TaskSchedImpl & parent_;
 		Task & user_;
@@ -636,6 +647,12 @@ namespace {
 	struct TaskForkGen
 		: StandardManualGenerator< TaskForkGen, AllocStatic< Temporal >>
 	{
+        enum : unsigned {
+            notify = 0x80000000U,
+            generator = 0x40000000U,
+            mask = 0x3fffffffU,
+        };
+
 		TaskForkGen( ThreadScheduler &, Task *& );
 
 		// Generator
@@ -646,10 +663,6 @@ namespace {
 		// local methods
 		void spawn( Task & );
 		void complete( void );
-
-		static const unsigned notify = 0x80000000U;
-		static const unsigned generator = 0x40000000U;
-		static const unsigned mask = 0x3fffffffU;
 
 		ThreadScheduler & parent_;
 		Task *& taskRef_;
@@ -755,11 +768,13 @@ namespace {
     struct VerifyStaticMonitor
         : StandardDisposable< VerifyStaticMonitor, Monitor, AllocStatic< Platform >>
     {
+        enum : uint64 {
 #ifdef TOOLS_DEBUG
-        static const uint64 realTimeContentionMax = 10 * TOOLS_NANOSECONDS_PER_MILLISECOND;
+            realTimeContentionMax = 10 * TOOLS_NANOSECONDS_PER_MILLISECOND,
 #else // TOOLS_DEBUG
-        static const uint64 realTimeContentionMax = TOOLS_NANOSECONDS_PER_MILLISECOND;
+            realTimeContentionMax = TOOLS_NANOSECONDS_PER_MILLISECOND,
 #endif // TOOLS_DEBUG
+        };
 
         VerifyStaticMonitor( AutoDispose< Monitor > &&, impl::ResourceSample const &, StringId const &, Monitor::Policy );
 

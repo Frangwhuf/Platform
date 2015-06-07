@@ -607,14 +607,18 @@ namespace tools {
         {
             // Default is just a hair under 2MB (to account for allocation header, etc).
             typedef AffinityT Type;
-            static const size_t maxBytes = ( ( 2U * 1024U * 1024U ) - 4096U );
+            enum : size_t {
+                maxBytes = ((2U * 1024U * 1024U) - 4096U),
+            };
         };
 
         template< typename AffinityT >
         struct AffinityAllocatorTraits< tools::Jumbo< AffinityT >>
         {
             typedef AffinityT Type;
-            static const size_t maxBytes = 0U;
+            enum : size_t {
+                maxBytes = 0U
+            };
         };
     };  // impl namespace
 
@@ -624,9 +628,11 @@ namespace tools {
     struct AllocatorAffinity
         : std::allocator< ElementT >
     {
+        enum : size_t {
+            maxBytes = tools::impl::AffinityAllocatorTraits< AffinityTraitsT >::maxBytes
+        };
         // Adapters
         typedef typename tools::impl::AffinityAllocatorTraits< AffinityTraitsT >::Type AffinityT;
-        static const size_t maxBytes = tools::impl::AffinityAllocatorTraits< AffinityTraitsT >::maxBytes;
         typedef tools::detail::ElementPool< ElementT, AffinityT > PoolT;
 
         // This is stateless, so everything works on nothing.
@@ -851,8 +857,10 @@ namespace tools {
         {
             // There are 5 pools. Begin at the one that fits 4x the number of elements and move up through
             // the pools, increasing scale by 4x each step.
-            static const size_t slabPoolsMax = 5U;
-            static const size_t cyclicBytesMax = 16384U;
+            enum : size_t {
+                slabPoolsMax = 5U,
+                cyclicBytesMax = 16384U,
+            };
 
             // Format the descriptor. We'll assume some raciness, this must be called before its first use.
             TOOLS_API void format( size_t );

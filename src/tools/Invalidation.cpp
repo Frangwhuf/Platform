@@ -20,11 +20,13 @@ namespace {
 	struct SubscrItem
 		: AllocStatic<>
 	{
-        static const unsigned CallingFlag = 0x1U;
-        static const unsigned DisposedFlag = 0x2U;
-        static const unsigned DirtyFlag = 0x4U;
-        static const unsigned InitializingFlag = 0x8U;
-        static const unsigned AllocatedFlag = 0x10U;
+        enum : unsigned {
+            CallingFlag = 0x1U,
+            DisposedFlag = 0x2U,
+            DirtyFlag = 0x4U,
+            InitializingFlag = 0x8U,
+            AllocatedFlag = 0x10U,
+        };
 
         SubscrItem( PubBase *, Thunk const &, Thunk const &, unsigned );
         ~SubscrItem( void );

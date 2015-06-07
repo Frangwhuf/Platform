@@ -120,7 +120,9 @@ namespace tools {
     template< typename ImplementationT, typename InterfaceT = ImplementationT >
     struct StandardThreadLocalHandle
     {
-        static const tools::uint64 DEADLOCALID = 0xdeaddeadbeefbeefULL;
+        enum : tools::uint64 {
+            DEADLOCALID = 0xdeaddeadbeefbeefULL,
+        };
 
         StandardThreadLocalHandle( void )
             : handle_( registerThreadLocalFactory( &id_, tools::detail::DefaultThreadLocalFactory< ImplementationT >::instance() ))
@@ -269,13 +271,13 @@ namespace tools {
 
 		// Ensure that any asynchronous operation (Request completion)
 		// completes on this scheduler.
-		virtual AutoDispose< Request > bind( AutoDispose< Request > &&, void * = nullptr ) = 0;
-		TOOLS_FORCE_INLINE AutoDispose< Request > bind( AutoDispose< Request > & inner )
+		virtual AutoDispose< Request > bind( AutoDispose< Request > &&, void * ) = 0;
+		TOOLS_FORCE_INLINE AutoDispose< Request > bind( AutoDispose< Request > && inner )
 		{
 			return bind( std::move( inner ), TOOLS_RETURN_ADDRESS() );
 		}
-		virtual AutoDispose< Generator > bind( AutoDispose< Generator > &&, void * = nullptr ) = 0;
-		TOOLS_FORCE_INLINE AutoDispose< Generator > bind( AutoDispose< Generator > & inner )
+		virtual AutoDispose< Generator > bind( AutoDispose< Generator > &&, void * ) = 0;
+		TOOLS_FORCE_INLINE AutoDispose< Generator > bind( AutoDispose< Generator > && inner )
 		{
 			return bind( std::move( inner ), TOOLS_RETURN_ADDRESS() );
 		}
@@ -299,8 +301,8 @@ namespace tools {
 		// Request has notified.  If the passed in Request completes
 		// before the returned Request is started, that Request will
 		// complete synchronously
-		static TOOLS_API AutoDispose< Request > fork( AutoDispose< Request > &&, void * = nullptr );
-		static inline AutoDispose< Request > fork( AutoDispose< Request > & inner )
+		static TOOLS_API AutoDispose< Request > fork( AutoDispose< Request > &&, void * );
+		static TOOLS_FORCE_INLINE AutoDispose< Request > fork( AutoDispose< Request > && inner )
 		{
 			return ThreadScheduler::fork( std::move( inner ), TOOLS_RETURN_ADDRESS() );
 		}
@@ -310,6 +312,10 @@ namespace tools {
 
     struct ScalableCounter
     {
+        enum : unsigned {
+            maxNumCpus = 64U,
+        };
+
         struct Data
         {
             Data( void ) : count_( 0ULL ) {}
@@ -319,6 +325,9 @@ namespace tools {
         };
 
         ScalableCounter( void ) {}
+        ScalableCounter(ScalableCounter const &) = delete;
+
+        ScalableCounter & operator=(ScalableCounter const &) = delete;
 
         inline void operator+=( uint64 delta )
         {
@@ -344,11 +353,6 @@ namespace tools {
         }
 
     private:
-        static const unsigned maxNumCpus = 64;
-
-        ScalableCounter( ScalableCounter const & ) { TOOLS_ASSERT( !"Copy not allowed" ); }
-        inline ScalableCounter & operator=( ScalableCounter const & ) { TOOLS_ASSERT( !"Assignment not allowed" ); return *this; }
-
         std::array< Data, maxNumCpus + 2 > vec_;
     };
 

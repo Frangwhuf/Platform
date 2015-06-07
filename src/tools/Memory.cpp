@@ -35,9 +35,11 @@ using namespace tools;
 //static void verifyHeapUnmap( Heap &, void * );
 
 namespace {
-    static const size_t temporalSlabSizeSmall = 32U * 1024U;  // [0, 256)
-    static const size_t temporalSlabSizeMedium = 256U * 1024U;  // [256, 16384)
-    static const size_t temporalSlabSizeLarge = 2U * 1024U * 1024U;  // [16384, 1MB)
+    enum : size_t {
+        temporalSlabSizeSmall = 32U * 1024U,  // [0, 256)
+        temporalSlabSizeMedium = 256U * 1024U,  // [256, 16384)
+        temporalSlabSizeLarge = 2U * 1024U * 1024U,  // [16384, 1MB)
+    };
 
     enum AlignModel
     {
@@ -105,6 +107,11 @@ namespace {
     struct BinaryPoolMaster
         : Pool
     {
+        enum : size_t {
+            // Array of blocks - this should be approximately proportional to the amount of concurrency.
+            tableSize = 128,
+        };
+
         BinaryPoolMaster( Pool &, impl::ResourceSample const & );
         ~BinaryPoolMaster( void );
 
@@ -123,9 +130,6 @@ namespace {
         Pool * inner_;
         // My desc
         Pool::Desc desc_;
-        // Array of blocks - this should be approximately proportional to the amount of
-        // concurrency.
-        static const size_t tableSize = 128;
         // Un-reunited moities
         BinaryBlock * volatile blocks_[ tableSize ];
     };
@@ -765,8 +769,10 @@ namespace {
         : Task
         , StandardDisposable< MemoryDumpTask, Disposable, AllocStatic< Platform >>
     {
-        static const unsigned intervalSec = 30;  // TODO: make configuration
-        static const unsigned intervalSecMin = 5;  // TODO: make configuration
+        enum : unsigned {
+            intervalSec = 30,  // TODO: make configuration
+            intervalSecMin = 5,  // TODO: make configuration
+        };
 
         MemoryDumpTask( ThreadScheduler & );
 
@@ -1088,6 +1094,10 @@ namespace {
     struct NodeSmallPoolBase
         : Pool
     {
+        enum : size_t {
+            superUnmapsMax = 2U,
+        };
+
         struct FreeSlab
         {
             bool operator<( FreeSlab const & r ) const {
@@ -1114,8 +1124,6 @@ namespace {
             bool passSuperUnmap_;
             uint32 refs_;
         };
-
-        static const size_t superUnmapsMax = 2U;
 
         NodeSmallPoolBase( Pool & );
         ~NodeSmallPoolBase( void );
@@ -1387,13 +1395,16 @@ namespace {
     struct ThreadLocalTemporalAffinity
         : Affinity
     {
-        typedef std::map< PoolSpec, TemporalPoolProxy > PoolMap;
         // A default run size.  TODO: start this smaller and make it more progressive
         // as use increases.
-        static const size_t sizeRun = temporalSlabSizeLarge;
-        static const size_t sizeRunMedium = temporalSlabSizeMedium;
-        static const size_t sizeRunSmall = temporalSlabSizeSmall;
-        static const size_t parentPoolCutoff = 1024U * 1024U;
+        enum : size_t {
+            sizeRun = temporalSlabSizeLarge,
+            sizeRunMedium = temporalSlabSizeMedium,
+            sizeRunSmall = temporalSlabSizeSmall,
+            parentPoolCutoff = 1024U * 1024U,
+        };
+
+        typedef std::map< PoolSpec, TemporalPoolProxy > PoolMap;
 
         ThreadLocalTemporalAffinity( Affinity &, impl::ResourceTrace *, bool );
 

@@ -12,7 +12,9 @@ using namespace tools;
 namespace {
     struct HeapInfo
     {
-        static const size_t reservationUnits = 32;
+        enum : size_t {
+            reservationUnits = 32,
+        };
 
         HeapInfo( void );
         ~HeapInfo( void );
