@@ -39,22 +39,22 @@ namespace tools {
         template< void (ImplementationT::*FuncT)( Error * ) >
         void
         call(
-            tools::Request & r,
+            tools::NoDispose<tools::Request> const & r,
             typename NotifyT::template ImplementationMethod< FuncT > *** = 0)
         {
             // TODO: assert no lock held
             TOOLS_ASSERT( !!notify_ );
-            r.start( tools::Completable< ImplementationT >::template toCompletion< FuncT >() );
+            r->start( tools::Completable< ImplementationT >::template toCompletion< FuncT >() );
         }
         void
         callFinish(
-            tools::Request & r )
+            tools::NoDispose<tools::Request> const & r )
         {
             // TODO: assert no lock held
             TOOLS_ASSERT( !!notify_ );
             tools::Completion notify;
             std::swap( notify, notify_ );
-            r.start( notify );
+            r->start( notify );
         }
         bool
         amStarted( void ) {
@@ -391,10 +391,10 @@ namespace tools {
         template< WaitFunc cc > struct WaitParam {};
         template< SuspendFunc cc > struct SuspendParam {};
 
-        RequestStep waitFinish( Request & req )
+        RequestStep waitFinish( NoDispose<Request> const & req )
         {
             TOOLS_ASSERT(!ThisRequestBaseT::completion_);
-            ThisRequestBaseT::completion_ = Completion( &ThisRequestBaseT::waitFinishStart, static_cast< void * >( &req ));
+            ThisRequestBaseT::completion_ = Completion( &ThisRequestBaseT::waitFinishStart, static_cast< void * >( &*req ));
             return RequestStepWait;
         }
 
@@ -444,18 +444,18 @@ namespace tools {
         }
 
         template< ContFunc conter >
-        RequestStep wait( Request & req, ContParam< conter > *** = 0 )
+        RequestStep wait( NoDispose<Request> const & req, ContParam< conter > *** = 0 )
         {
             TOOLS_ASSERT(!ThisRequestBaseT::completion_);
-            ThisRequestBaseT::completion_ = Completion( &ThisRequestBaseT::template cCont< conter >::startF, static_cast< void * >( &req ));
+            ThisRequestBaseT::completion_ = Completion( &ThisRequestBaseT::template cCont< conter >::startF, static_cast< void * >( &*req ));
             return RequestStepWait;
         }
 
         template< WaitFunc waiter >
-        RequestStep wait( Request & req, WaitParam< waiter > *** = 0 )
+        RequestStep wait( NoDispose<Request> const & req, WaitParam< waiter > *** = 0 )
         {
             TOOLS_ASSERT(!ThisRequestBaseT::completion_);
-            ThisRequestBaseT::completion_ = Completion( &ThisRequestBaseT::template cWait< waiter >::startF, static_cast< void * >( &req ));
+            ThisRequestBaseT::completion_ = Completion( &ThisRequestBaseT::template cWait< waiter >::startF, static_cast< void * >( &*req ));
             return RequestStepWait;
         }
 
@@ -638,20 +638,20 @@ namespace tools {
         // At present, there is no mechanism for intercepting errors.  Any failures will be passed to the
         // user of this stream.  Behavior of this implementation helper is undefined after an error.
         template< ContFunc conter >
-        StreamStep wait( Request & req, ContParam< conter > *** = 0 )
+        StreamStep wait( NoDispose<Request> const & req, ContParam< conter > *** = 0 )
         {
             TOOLS_ASSERT( !completion_ );
             stepable_.next_ = conter;
-            stepable_.wait_ = &req;
+            stepable_.wait_ = &*req;
             return RequestStepWait;
         }
 
         template< ContFunc conter >
-        StreamStep maybeWait( Request * req, ContParam< conter > *** = 0 )
+        StreamStep maybeWait( AutoDispose<Request> && req, ContParam< conter > *** = 0 )
         {
             TOOLS_ASSERT( !completion_ );
             stepable_.next_ = conter;
-            stepable_.wait_ = req;
+            stepable_.wait_ = req.get();
             return !req ? RequestStepContinue : RequestStepWait;
         }
 

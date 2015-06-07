@@ -10,7 +10,7 @@ namespace tools {
         virtual void start( Completion const & ) = 0;
     };
 
-    TOOLS_API AutoDispose< Error::Reference > runRequestSynchronously( AutoDispose< Request > const & );
+    TOOLS_API AutoDispose< Error::Reference > runRequestSynchronously( NoDispose< Request > const & );
 
     struct Generator
         : Request

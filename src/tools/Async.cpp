@@ -184,7 +184,7 @@ static StandardThreadLocalHandle< SyncLocal > syncLocal_;
 ///////////////////////
 
 AutoDispose< Error::Reference >
-tools::runRequestSynchronously( AutoDispose< Request > const & req )
+tools::runRequestSynchronously( NoDispose< Request > const & req )
 {
     SyncThunk thunk;
     {

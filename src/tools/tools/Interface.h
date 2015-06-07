@@ -253,18 +253,12 @@ namespace tools {
 
         TOOLS_FORCE_INLINE NoDispose(void) : p_(nullptr) {}
         TOOLS_FORCE_INLINE NoDispose(nullptr_t) : p_(nullptr) {}
-        template<typename AnyT>
-        TOOLS_FORCE_INLINE NoDispose(AnyT * const & p)
-            : p_(p)
-        {
-            static_assert(std::is_base_of<TypeT, AnyT>::value, "AnyT must derive from TypeT");
-        }
-        template<typename AnyT>
-        TOOLS_FORCE_INLINE NoDispose(AnyT * volatile const & p)
-            : p_(p)
-        {
-            static_assert(std::is_base_of<TypeT, AnyT>::value, "AnyT must derive from TypeT");
-        }
+        TOOLS_FORCE_INLINE NoDispose(TypeT & p)
+            : p_(&p)
+        {}
+        TOOLS_FORCE_INLINE NoDispose(TypeT volatile & p)
+            : p_(&p)
+        {}
         template<typename AnyT>
         TOOLS_FORCE_INLINE NoDispose(AutoDispose<AnyT> const & r)
             : p_(r.get())
@@ -281,16 +275,12 @@ namespace tools {
             p_ = nullptr;
             return *this;
         }
-        template<typename AnyT>
-        TOOLS_FORCE_INLINE NoDispose<TypeT> & operator=(AnyT * const & p) {
-            static_assert(std::is_base_of<TypeT, AnyT>::value, "AnyT must derive from TypeT");
-            p_ = p;
+        TOOLS_FORCE_INLINE NoDispose<TypeT> & operator=(TypeT & p) {
+            p_ = &p;
             return *this;
         }
-        template<typename AnyT>
-        TOOLS_FORCE_INLINE NoDispose<TypeT> & operator=(AnyT * volatile const & p) {
-            static_assert(std::is_base_of<TypeT, AnyT>::value, "AnyT must derive from TypeT");
-            p_ = p;
+        TOOLS_FORCE_INLINE NoDispose<TypeT> & operator=(TypeT volatile & p) {
+            p_ = &p;
             return *this;
         }
         template<typename AnyT>
@@ -306,6 +296,21 @@ namespace tools {
             return *this;
         }
         template<typename AnyT>
+        TOOLS_FORCE_INLINE bool operator==(AnyT const * r) const {
+            static_assert(std::is_base_of<TypeT, AnyT>::value, "AnyT must derive from TypeT");
+            return (p_ == static_cast<TypeT const *>(r));
+        }
+        template<typename AnyT>
+        TOOLS_FORCE_INLINE bool operator==(AutoDispose<AnyT> const & r) const {
+            static_assert(std::is_base_of<TypeT, AnyT>::value, "AnyT must derive from TypeT");
+            return (p_ == static_cast<TypeT *>(r.get()));
+        }
+        template<typename AnyT>
+        TOOLS_FORCE_INLINE bool operator==(NoDispose<AnyT> const & r) const {
+            static_assert(std::is_base_of<TypeT, AnyT>::value, "AnyT must derive from TypeT");
+            return (p_ == static_cast<TypeT *>(r.p_));
+        }
+        template<typename AnyT>
         TOOLS_FORCE_INLINE operator AnyT *(void) const {
             static_assert(std::is_base_of<TypeT, AnyT>::value, "AnyT must derive from TypeT");
             return static_cast<DisposeForbidden *>(p_);
@@ -315,6 +320,9 @@ namespace tools {
         }
         TOOLS_FORCE_INLINE bool operator!(void) const {
             return !p_;
+        }
+        TOOLS_FORCE_INLINE TypeT & operator*(void) const {
+            return *static_cast<DisposeForbidden *>(p_);
         }
 
     protected:
