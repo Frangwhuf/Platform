@@ -54,22 +54,6 @@ namespace tools {
         , tools::Disposable
     {};
 
-    //namespace impl {
-    //    template< typename TypeT >
-    //    class DisposeForbidden
-    //        : public TypeT
-    //    {
-    //        template< typename SomeT, typename OtherT >
-    //        DisposeForbidden( SomeT && param1, OtherT && param2 )
-    //            : TypeT( a, b )
-    //        {} // This is here to prevent generating default constructor calls.
-
-    //        // Declaring this here (private) prevents people who have this type from calling it when not
-    //        // appropriate.
-    //        virtual void dispose( void ) = 0;
-    //    };
-    //};  // impl namespace
-
     ///
     // Standard smart-pointer for Disposable items.  This is fairly compatable with
     // unique_ptr semantics.
@@ -261,6 +245,86 @@ namespace tools {
     }
 
     TOOLS_API AutoDispose<> nullDisposable( void );
+
+    template<typename TypeT>
+    struct NoDispose
+    {
+        typedef typename tools::AutoDispose<TypeT>::DisposeForbidden DisposeForbidden;
+
+        TOOLS_FORCE_INLINE NoDispose(void) : p_(nullptr) {}
+        TOOLS_FORCE_INLINE NoDispose(nullptr_t) : p_(nullptr) {}
+        template<typename AnyT>
+        TOOLS_FORCE_INLINE NoDispose(AnyT * const & p)
+            : p_(p)
+        {
+            static_assert(std::is_base_of<TypeT, AnyT>::value, "AnyT must derive from TypeT");
+        }
+        template<typename AnyT>
+        TOOLS_FORCE_INLINE NoDispose(AnyT * volatile const & p)
+            : p_(p)
+        {
+            static_assert(std::is_base_of<TypeT, AnyT>::value, "AnyT must derive from TypeT");
+        }
+        template<typename AnyT>
+        TOOLS_FORCE_INLINE NoDispose(AutoDispose<AnyT> const & r)
+            : p_(r.get())
+        {
+            static_assert(std::is_base_of<TypeT, AnyT>::value, "AnyT must derive from TypeT");
+        }
+        template<typename AnyT>
+        TOOLS_FORCE_INLINE NoDispose(NoDispose<AnyT> const & r)
+            : p_(r.p_)
+        {
+            static_assert(std::is_base_of<TypeT, AnyT>::value, "AnyT must derive from TypeT");
+        }
+        TOOLS_FORCE_INLINE NoDispose<TypeT> & operator=(nullptr_t) {
+            p_ = nullptr;
+            return *this;
+        }
+        template<typename AnyT>
+        TOOLS_FORCE_INLINE NoDispose<TypeT> & operator=(AnyT * const & p) {
+            static_assert(std::is_base_of<TypeT, AnyT>::value, "AnyT must derive from TypeT");
+            p_ = p;
+            return *this;
+        }
+        template<typename AnyT>
+        TOOLS_FORCE_INLINE NoDispose<TypeT> & operator=(AnyT * volatile const & p) {
+            static_assert(std::is_base_of<TypeT, AnyT>::value, "AnyT must derive from TypeT");
+            p_ = p;
+            return *this;
+        }
+        template<typename AnyT>
+        TOOLS_FORCE_INLINE NoDispose<TypeT> & operator=(AutoDispose<AnyT> const & r) {
+            static_assert(std::is_base_of<TypeT, AnyT>::value, "AnyT must derive from TypeT");
+            p_ = r.get();
+            return *this;
+        }
+        template<typename AnyT>
+        TOOLS_FORCE_INLINE NoDispose<TypeT> & operator=(NoDispose<AnyT> const & r) {
+            static_assert(std::is_base_of<TypeT, AnyT>::value, "AnyT must derive from TypeT");
+            p_ = r.p_;
+            return *this;
+        }
+        template<typename AnyT>
+        TOOLS_FORCE_INLINE operator AnyT *(void) const {
+            static_assert(std::is_base_of<TypeT, AnyT>::value, "AnyT must derive from TypeT");
+            return static_cast<DisposeForbidden *>(p_);
+        }
+        TOOLS_FORCE_INLINE DisposeForbidden * operator->(void) const {
+            return static_cast<DisposeForbidden *>(p_);
+        }
+        TOOLS_FORCE_INLINE bool operator!(void) const {
+            return !p_;
+        }
+
+    protected:
+        // The following is needed to allow implicit conversion when moving from AutoDispose<derived> to
+        // AutoDispose<base> without breaking encapsulation by introducing public helper methods.
+        template<typename AnyT>
+        friend struct NoDispose;
+
+        TypeT * p_;
+    };
 
     // An AutoDisposePair couples a pointer to a thing and an external lifetime control for that thing.
     template< typename InterfaceT, typename AutoDispT = tools::AutoDispose<> >

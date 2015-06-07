@@ -197,6 +197,31 @@ namespace tools {
 	struct TestEnv : Environment {};
 	struct Test
 	{
+        struct RequestStatus
+            : AllocStatic<>
+        {
+            TOOLS_FORCE_INLINE RequestStatus(void) : started_(false), notified_(false) {}
+
+            TOOLS_FORCE_INLINE void success(void) const {
+                TOOLS_ASSERTR(started_);
+                TOOLS_ASSERTR(notified_ && "Request may have gone asyc");
+                TOOLS_ASSERTR(!err_);
+            }
+            TOOLS_FORCE_INLINE void error(void) const {
+                TOOLS_ASSERTR(started_);
+                TOOLS_ASSERTR(notified_ && "Request may have gone async");
+                TOOLS_ASSERTR(!!err_);
+            }
+            TOOLS_FORCE_INLINE void unnotified(void) const {
+                TOOLS_ASSERTR(started_);
+                TOOLS_ASSERTR(!notified_);
+            }
+
+            bool started_;
+            bool notified_;
+            AutoDispose<Error::Reference> err_;
+        };
+
 		virtual void sync(void) = 0;
 		virtual void resume(void) = 0;
 		virtual void progressTime(void) = 0;
@@ -209,6 +234,19 @@ namespace tools {
 		virtual TestEnv & environment(void) = 0;
 		virtual Environment & trueEnvironment(void) = 0;
 		virtual AutoDispose<> & cloak(void) = 0;
+
+        virtual void run(NoDispose<Request> const &, RequestStatus &) = 0;
+        TOOLS_FORCE_INLINE void run(AutoDispose<Request> && req, RequestStatus & status) {
+            NoDispose<Request> local(req);
+            finalize(std::move(req));
+            run(local, status);
+        }
+        virtual void runAndAssertSuccess(AutoDispose<Request> &&) = 0;
+        virtual void runAndAssertSuccess(NoDispose<Request> const &) = 0;
+        virtual void runAndAssertError(AutoDispose<Request> &&) = 0;
+        virtual void runAndAssertError(NoDispose<Request> const &) = 0;
+
+        virtual void generatorNext(NoDispose<Generator> const &, unsigned = 5) = 0;
 	};
 
     struct AutoMock

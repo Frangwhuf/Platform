@@ -1,5 +1,6 @@
 #include "toolsprecompiled.h"
 
+#include <tools/AtomicCollections.h>
 #include <tools/Concurrency.h>
 #include <tools/Threading.h>
 #include <tools/WeakPointer.h>

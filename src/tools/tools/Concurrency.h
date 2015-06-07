@@ -2462,10 +2462,13 @@ TOOLS_WARNINGS_RESTORE
         , boost::noncopyable
     {
         StandardStaticReferenced( void )
-            : refs_( 1 )
+            : refs_( 0 )
         {}
         ~StandardStaticReferenced( void )
         {
+            if (refs_ != 0) {
+                fprintf(stderr, "refs = %u on %s", refs_, tools::nameOf<ImplementationT>().c_str());
+            }
             TOOLS_ASSERT( refs_ == 0 );
         }
         void

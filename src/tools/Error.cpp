@@ -11,7 +11,7 @@ using namespace tools;
 struct CancelError
     : StandardStaticReferenced< CancelError, Error >
 {
-    CancelError( void );
+    CancelError(void);
 };
 
 ///////////////////////
@@ -22,7 +22,7 @@ AutoDispose< Error::Reference >
 tools::errorCancelNew( void )
 {
     static CancelError ret;
-    return static_cast< Error::Reference * >( &ret );
+    return ret.ref();
 }
 
 //////////////

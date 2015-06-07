@@ -71,12 +71,19 @@ namespace {
 		TestEnv & environment(void) override;
 		Environment & trueEnvironment(void) override;
 		AutoDispose<> & cloak(void) override;
+        void run(NoDispose<Request> const &, RequestStatus &) override;
+        void runAndAssertSuccess(AutoDispose<Request> &&) override;
+        void runAndAssertSuccess(NoDispose<Request> const &) override;
+        void runAndAssertError(AutoDispose<Request> &&) override;
+        void runAndAssertError(NoDispose<Request> const &) override;
+        void generatorNext(NoDispose<Generator> const &, unsigned) override;
 
         // local methods
         bool isMainThread(void);
         void firePendingTimers(uint64);
         void start(Thunk const &);
         void workerEntry(void);
+        static void requestCompletion(void *, Error *);
 
 		Environment & trueEnvironment_;
 		StringId name_;
@@ -470,6 +477,75 @@ TestImpl::cloak(void)
     return testCloak_;
 }
 
+void
+TestImpl::run(
+    NoDispose<Request> const & req,
+    RequestStatus & status)
+{
+    status.started_ = true;
+    status.notified_ = false;
+    status.err_ = nullptr;
+    req->start(Completion(requestCompletion, reinterpret_cast<Error *>(&status)));
+}
+
+void
+TestImpl::runAndAssertSuccess(
+    AutoDispose<Request> && req)
+{
+    if (!!req) {
+        RequestStatus status;
+        run(std::move(req), status);
+        status.success();
+    }
+}
+
+void
+TestImpl::runAndAssertSuccess(
+    NoDispose<Request> const & req)
+{
+    if (!!req) {
+        RequestStatus status;
+        run(req, status);
+        status.success();
+    }
+}
+
+void
+TestImpl::runAndAssertError(
+    AutoDispose<Request> && req)
+{
+    if (!!req) {
+        RequestStatus status;
+        run(std::move(req), status);
+        status.error();
+    }
+}
+
+void
+TestImpl::runAndAssertError(
+    NoDispose<Request> const & req)
+{
+    if (!!req) {
+        RequestStatus status;
+        run(req, status);
+        status.error();
+    }
+}
+
+void
+TestImpl::generatorNext(
+    NoDispose<Generator> const & generator,
+    unsigned numAsyncs)
+{
+    if (!!generator) {
+        unsigned count = 0;
+        while (!generator->next()) {
+            TOOLS_ASSERTR(count++ < numAsyncs);
+            runAndAssertSuccess(generator);
+        }
+    }
+}
+
 bool
 TestImpl::isMainThread(void)
 {
@@ -542,6 +618,20 @@ TestImpl::workerEntry(void)
         TOOLS_ASSERT(!nextThreadThunk_); // There should be no pending work
     }
     syncControl_->signal();
+}
+
+void
+TestImpl::requestCompletion(
+    void * param,
+    Error * err)
+{
+    RequestStatus * status = reinterpret_cast<RequestStatus *>(param);
+    status->notified_ = true;
+    if (!!err) {
+        status->err_ = err->ref();
+    } else {
+        status->err_ = nullptr;
+    }
 }
 
 ///////////////

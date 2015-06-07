@@ -4,12 +4,20 @@
 #include <tools/Meta.h>
 #include <tools/Tools.h>
 
+#include <mmintrin.h>
+
 namespace tools {
     namespace impl {
         TOOLS_API bool leakProtect( void );
     };  // impl namespace
     namespace detail {
         TOOLS_API uint64 physicalMemory( void );
+        static TOOLS_FORCE_INLINE void prefetch(void * ptr) {
+            _mm_prefetch(static_cast<char const *>(ptr), _MM_HINT_T0);
+        }
+        static TOOLS_FORCE_INLINE void unfetch(void * ptr) {
+            _mm_prefetch(static_cast<char const *>(ptr), _MM_HINT_NTA);
+        }
     };  // detail namespace
 
     ///

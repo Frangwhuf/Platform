@@ -1,5 +1,6 @@
 #include "toolsprecompiled.h"
 
+#include <tools/AtomicCollections.h>
 // #include <tools/Buffer.h>
 #include <tools/Concurrency.h>
 // #include <tools/Helpers.h>

@@ -81,270 +81,6 @@ namespace tools {
         Completion notify_;
     };
 
-    namespace detail
-    {
-        struct RequestReactorCore
-            : tools::Notifiable< RequestReactorCore >
-            , tools::Completable< RequestReactorCore >
-            , tools::Task
-        {
-            RequestReactorCore( void )
-                : waitReq_( nullptr )
-            {
-            }
-
-            // Task
-            void
-            execute( void )
-            {
-                reactorContinue();
-            }
-
-            // local methods
-            void
-            reactorFinishError( void )
-            {
-                //TOOLS_ASSERT( tools::lockLevelVerify( 0 ));
-                TOOLS_ASSERT( !!finishError_ );
-                tools::AutoDispose< tools::Error::Reference > err( std::move( finishError_ ));
-                // err = std::move( tools::errorInfoSymbol( err, waitFrom_, "finished from" ));
-                callerParam_.fire( err.get() );
-            }
-            void
-            reactorFinish( void )
-            {
-                //TOOLS_ASSERT( tools::lockLevelVerify( 0 ));
-                TOOLS_ASSERT( !finishError_ );
-                callerParam_.fire();
-            }
-            void
-            reactorWaitFinish( void )
-            {
-                TOOLS_ASSERT( !!waitReq_ );
-                //TOOLS_ASSERT( tools::lockLevelVerify( 0 ));
-                tools::Completion e;
-                std::swap( e, callerParam_ );
-                waitReq_->start( e );
-            }
-            void
-            reactorWaitTryNotify(
-                tools::Error * err )
-            {
-                TOOLS_ASSERT( !!nextError_ );
-                TOOLS_ASSERT( !nextStep_ );
-                waitReq_ = nullptr;
-                if( !!err ) {
-                    // Mix in some more debugging information in the error
-                    //err = tools::errorInfoSymbol( err, nextError_, "continuation function" );
-                }
-                // Pass the error back to our user
-                nextError_.fire( err );
-                // evolve the state machine
-                TOOLS_ASSERT( !!nextStep_ );
-                nextStep_.fire();
-            }
-            void
-            reactorTryWait( void )
-            {
-                TOOLS_ASSERT( !!waitReq_ );
-                TOOLS_ASSERT( !!nextError_ );
-                //TOOLS_ASSERT( tools::lockLevelVerify( 0 ));
-                waitReq_->start( toCompletion< &RequestReactorCore::reactorWaitTryNotify >() );
-            }
-            void
-            reactorWaitNotify(
-                tools::Error * err )
-            {
-                TOOLS_ASSERT( !!nextThunk_ );
-                TOOLS_ASSERT( !nextStep_ );
-                waitReq_ = nullptr;
-                if( !!err ) {
-                    //finishError_ = std::move( tools::errorChainInfo( err, waitInfo_ ));
-                    //finishError_ = std::move( tools::errorInfoSymbol( finishError_, nextThunk_, "continuation function" ));
-                    finishError_ = std::move( err->ref() );
-                    nextThunk_ = tools::Thunk();
-                    nextStep_ = toThunk< &RequestReactorCore::reactorFinishError >();
-                } else {
-                    // Call back to our user
-                    nextThunk_.fire();
-                    TOOLS_ASSERT( !!nextStep_ );
-                }
-                // evolve the state machine
-                nextStep_.fire();
-            }
-            void
-            reactorWait( void )
-            {
-                TOOLS_ASSERT( !!waitReq_ );
-                TOOLS_ASSERT( !!nextThunk_ );
-                //TOOLS_ASSERT( tools::lockLevelVerify( 0 ));
-                waitReq_->start(this->toCompletion< &RequestReactorCore::reactorWaitNotify >() );
-            }
-            void
-            reactorContinue( void )
-            {
-#ifndef TOOLS_RELEASE
-loop:
-#endif // !TOOLS_RELEASE
-                TOOLS_ASSERT( !waitReq_ );
-                TOOLS_ASSERT( !!nextThunk_ || !!nextError_ ); // one must be set
-                TOOLS_ASSERT( !nextThunk_ || !nextError_ ); // only one can be set
-                TOOLS_ASSERT( !nextStep_ );
-                //TOOLS_ASSERT( tools::lockLevelVerify( 0 ));
-                // Pass control back to the user
-                if( !!nextThunk_ ) {
-                    nextThunk_.fire();
-                } else {
-                    nextError_.fire();
-                }
-                TOOLS_ASSERT( !!nextStep_ );
-#ifndef TOOLS_RELEASE
-                // Non-release builds do not seem to trigger the compiler to emit tail
-                // call optimizations.  So we'll to our own version here.
-                if( nextStep_ == toThunk< &RequestReactorCore::reactorContinue >() ) {
-                    nextStep_ = tools::Thunk();
-                    goto loop;
-                }
-#endif // !TOOLS_RELEASE
-                // evolve the state machine
-                nextStep_.fire();
-            }
-
-            tools::Completion callerParam_;  // result to the caller
-            tools::Thunk nextStep_;     // for internal state machine
-            tools::Completion nextError_;    // callback for next step
-            tools::Thunk nextThunk_;    // callback for next step
-            tools::Request * waitReq_;
-            void * waitFrom_;
-            //tools::ErrorInfo * waitInfo_;
-            tools::AutoDispose< tools::Error::Reference > finishError_;  // completion error
-        };
-    };  // detail namespace
-
-    template< typename ImplementationT, typename AffinityT = tools::Temporal, typename InterfaceT = tools::Request >
-    struct StandardReactorRequest
-        : tools::StandardDisposable< ImplementationT, InterfaceT, tools::AllocDynamic< AffinityT >>
-        , tools::Notifiable< ImplementationT >
-        , tools::Completable< ImplementationT >
-    {
-    private:
-        typedef typename tools::Notifiable< ImplementationT >::ParamT NotifyParamT;
-        typedef typename tools::Completable< ImplementationT >::ParamT ErrorNotifyParamT;
-        detail::RequestReactorCore core;
-    protected:
-        template< void (ImplementationT::*ErrorFunctionT)( tools::Error * ) >
-        void
-        wait( tools::Request & req, typename ErrorNotifyParamT::template ImplementationMethod< ErrorFunctionT > *** = 0 )
-        {
-            tools::Completion e = tools::Completable< ImplementationT >::template toCompletion< ErrorFunctionT >();
-            TOOLS_ASSERT( !core.callerParam_ );
-            TOOLS_ASSERT( !core.nextThunk_ );
-            TOOLS_ASSERT( !core.waitReq_ );
-            TOOLS_ASSERT( !core.nextStep_ );
-            core.callerParam_ = e;
-            core.waitReq_ = &req;
-            core.waitFrom_ = TOOLS_RETURN_ADDRESS();
-            core.nextStep_ = core.toThunk< &detail::RequestReactorCore::reactorTryWait >();
-        }
-        template< void (ImplementationT::*ThunkFunctionT)( void ) >
-        void
-        wait( tools::Request & req,/* tools::ErrorInfo & info,*/ typename NotifyParamT::template ImplementationMethod< ThunkFunctionT > *** = 0 )
-        {
-            tools::Thunk t = tools::Notifiable< ImplementationT >::template toThunk< ThunkFunctionT >();
-            TOOLS_ASSERT( !core.callerParam_ );
-            TOOLS_ASSERT( !core.nextThunk_ );
-            TOOLS_ASSERT( !core.waitReq_ );
-            TOOLS_ASSERT( !core.nextStep_ );
-            core.nextThunk_ = t;
-            core.waitReq_ = &req;
-            core.waitFrom_ = TOOLS_RETURN_ADDRESS();
-            //core.waitInfo_ = &info;
-            core.nextStep_ = core.toThunk< &detail::RequestReactorCore::reactorWait >();
-        }
-        template< void (ImplementationT::*ErrorFunctionT)( tools::Error * ) >
-        void
-        continuation( typename ErrorNotifyParamT::template ImplementationMethod< ErrorFunctionT > *** = 0 )
-        {
-            tools::Completion e = tools::Completable< ImplementationT >::template toCompletion< ErrorFunctionT >();
-            TOOLS_ASSERT( !core.callerParam_ );
-            TOOLS_ASSERT( !core.nextThunk_ );
-            TOOLS_ASSERT( !core.waitReq_ );
-            TOOLS_ASSERT( !core.nextStep_ );
-            core.callerParam_ = e;
-            core.nextStep_ = core.toThunk< &detail::RequestReactorCore::reactorContinue >();
-        }
-        template< void (ImplementationT::*ThunkFunctionT)( void ) >
-        void
-        continuation( typename NotifyParamT::template ImplementationMethod< ThunkFunctionT > *** = 0 )
-        {
-            tools::Thunk t = tools::Notifiable< ImplementationT >::template toThunk< ThunkFunctionT >();
-            TOOLS_ASSERT( !core.callerParam_ );
-            TOOLS_ASSERT( !core.nextThunk_ );
-            TOOLS_ASSERT( !core.waitReq_ );
-            TOOLS_ASSERT( !core.nextStep_ );
-            core.callerParam_ = t;
-            core.nextStep_ = core.toThunk< &detail::RequestReactorCore::reactorContinue >();
-        }
-        void
-        finish(
-            tools::Error * err )
-        {
-            TOOLS_ASSERT( !core.callerParam_ );
-            TOOLS_ASSERT( !core.nextThunk_ );
-            TOOLS_ASSERT( !core.waitReq_ );
-            TOOLS_ASSERT( !core.nextStep_ );
-            if( !!err ) {
-                core.finishError_ = std::move( err->ref() );
-                core.nextStep_ = core.toThunk< &detail::RequestReactorCore::reactorFinishError >();
-            } else {
-                core.nextStep_ = core.toThunk< &detail::RequestReactorCore::reactorFinish >();
-            }
-        }
-        void
-        finish(
-            tools::Error & err )
-        {
-            finish( &err );
-        }
-        void
-        finish( void )
-        {
-            finish( nullptr );
-        }
-        void
-        waitFinish(
-            tools::Request & req)
-        {
-            TOOLS_ASSERT( !core.callerParam_ );
-            TOOLS_ASSERT( !core.nextThunk_ );
-            TOOLS_ASSERT( !core.waitReq_ );
-            TOOLS_ASSERT( !core.nextStep_ );
-            core.waitReq_ = &req;
-            core.nextStep_ = core.toThunk< &detail::RequestReactorCore::reactorWaitFinish >();
-        }
-    public:
-        // Request
-        void
-        start(
-            tools::Completion const & callback )
-        {
-            TOOLS_ASSERT( !core.callerParam_ );
-            TOOLS_ASSERT( !core.nextError_ );
-            TOOLS_ASSERT( !core.nextThunk_ );
-            TOOLS_ASSERT( !core.nextStep_ );
-            TOOLS_ASSERT( !core.waitReq_ );
-            core.callerParam_ = callback;
-            core.nextThunk_ = tools::Notifiable< ImplementationT >::template toThunk< &ImplementationT::start >();
-            tools::ThreadScheduler::current().spawn( core );
-        }
-        virtual void
-        start( void )
-        {
-            TOOLS_ASSERT( !"StandardReactorRequest - implementation must define start()" );
-        }
-        // TODO: maybe add some class new/delete operators for implementations with extension arrays
-    };
-
     enum RequestStep
     {
         RequestStepNext,  // As zero, this can be a placeholder for 'no action queued'
@@ -375,15 +111,15 @@ loop:
             }
 
             // Save the real completion on the stack
-            void doComplete( Completion * __restrict refComplete, bool funcOnly )
+            void doComplete( Completion * __restrict refComplete )
             {
                 // TODO: assert that there are no locks held
                 TOOLS_ASSERT( !!completion_ );  // to use this, we really should have one of these
-                if( funcOnly ) {
-                    refComplete->func_ = completion_.func_;
-                } else {
-                    *refComplete = completion_;
-                }
+                *refComplete = completion_;
+#ifdef TOOLS_DEBUG
+                // Clear the completion, ready to accep the next step.
+                completion_ = Completion();
+#endif // TOOLS_DEBUG
             }
 
             // On entry, if step != RequestStepFinish, then completion_ has been smashed with information
@@ -393,7 +129,8 @@ loop:
             //
             // On exit (unless we are Finishing):
             //     Restore completion_ to the one that this request is to respond to.
-            //     Store in refComplete the next step function
+            //     Store in refComplete the next step function, this. refErr contains the param for the next
+            //         step function (e.g.: the req *).
             // If Finishing:
             //     no change
             void eval( RequestStep step, Completion * __restrict refComplete, Error ** __restrict refErr )
@@ -411,17 +148,74 @@ loop:
                 }
             }
 
-            RequestStep finish( void )
+            // Functions to help get stack unwinding in debug builds.
+            //
+            // In debug builds, tail-call optimization is generally disabled. So this would
+            // consume potentially a great many more stack frames. The reactor loop is used
+            // in debug builds to execute back-to-back conts without also consuming additional
+            // stack frames.
+            //
+            // The reactor loops is only used to conts. All other 'next step' functions will
+            // be executed directly.
+            //
+            // The implementation for this is unpleasant. The reactor needs to know if the
+            // next implementation entry is the next back-to-back cont (as opposed to wait<..>
+            // or finish). To record this, a pointer to the flag is stored in the completion_
+            // function.
+            //
+            // The reactor loop calls the completion_ with the optErr pointing to the flag.
+            // In order to distinguish this from an actual Error * and a flag pointer, the
+            // least significant bit is set to 1 for flag pointers.
+            //
+            // Lastly, the completion_ function uses the existance of the flag pointer to know
+            // that it's in a reactor loop. In which case it will return instead of starting
+            // a new reactor loop.
+            static TOOLS_FORCE_INLINE uint64 * contSeenFromError(Error * err)
             {
 #ifdef TOOLS_DEBUG
-                completion_ = Completion();
+                ptrdiff_t ptr = reinterpret_cast<ptrdiff_t>(err);
+                if ((ptr & 0x1) != 0) {
+                    return reinterpret_cast<uint64 *>(ptr - 1);
+                }
 #endif // TOOLS_DEBUG
+                return nullptr;
+            }
+
+#ifdef TOOLS_DEBUG
+            static TOOLS_FORCE_INLINE Error * contSeenToErr(uint64 * seen)
+            {
+                return reinterpret_cast<Error *>(reinterpret_cast<ptrdiff_t>(seen) | 0x1);
+            }
+
+            void doContReactor(Completion real, uint64 * seen)
+            {
+                // The reactor is on the stack if seen is !nullptr
+                if (!!seen) {
+                    *seen = 1;
+                    return;
+                }
+                // Begin a new reactor loop
+                uint64 localSeen;
+                do {
+                    localSeen = 0U;
+                    Completion::FunctionT userFunc = completion_.func_;
+                    TOOLS_ASSERT(!completion_.param_);
+                    completion_ = real;
+                    userFunc(static_cast<void *>(this), contSeenToErr(&localSeen));
+                } while (localSeen != 0);
+            }
+#endif // TOOLS_DEBUG
+
+            RequestStep finish( void )
+            {
+                TOOLS_ASSERT(!completion_);
                 return tools::RequestStepFinish;
             }
 
-            // During start(), or a notification function, this can be used to give
-            // details about the step that was called.  Otherwise it contains who to
-            // complete to.
+            // The majority of the time, this contains who to complete to. However,
+            // during start(), or a notification function, this can be used to give
+            // details about the step that was called. During a call to a notification
+            // function, the real value of this is saved on the stack.
             Completion completion_;
         };
 
@@ -436,7 +230,8 @@ loop:
             typedef RequestStep ( ImplementationT::* ContFunc )( void );
             typedef void (ImplementationT::* SuspendFunc)();
 
-            // Be terse on name length for debug symbols
+            // Be terse on name length for debug symbols. This is for implementation callbacks which take
+            // Error *.
             template< WaitFunc waiter >
             struct cWait
             {
@@ -449,14 +244,21 @@ loop:
                 {
                     Completion local;
                     local.param_ = param_;
-                    Error * localOpt = opt;
+                    auto seen = ThisRequestBaseT::contSeenFromError(opt);
+                    Error * localOpt = (!!seen) ? nullptr : opt;
                     {
                         ThisRequestBaseT * __restrict this_ = static_cast< ThisRequestBaseT * >( local.param_ );
                         // Save things
-                        this_->doComplete( &local, false );
+                        this_->doComplete( &local );
                         Error * moreLocalOpt = localOpt;
                         localOpt = nullptr;
-                        this_->eval( runWaitF( static_cast< ImplementationT * __restrict >( this_ ), moreLocalOpt ), &local, &localOpt );
+                        RequestStep step = runWaitF(static_cast<ImplementationT * __restrict>(this_), moreLocalOpt);
+#ifdef TOOLS_DEBUG
+                        if (step == RequestStepContinue) {
+                            return this_->doContReactor(local, seen);
+                        }
+#endif // TOOLS_DEBUG
+                        this_->eval( step, &local, &localOpt );
                     }
                     // On to the next step!
                     local.fire( localOpt );
@@ -469,6 +271,8 @@ loop:
                 }
             };
 
+            // Be terse on name length for debug symbols. This is for implementation callback which take no
+            // parameters.
             template< ContFunc conter >
             struct cCont
             {
@@ -481,20 +285,27 @@ loop:
                 {
                     Completion local;
                     local.param_ = param;
-                    Error * localOpt = opt;
+                    auto seen = ThisRequestBaseT::contSeenFromError(opt);
+                    Error * localOpt = (!!seen) ? nullptr : opt;
                     if( !localOpt ) {
                         ThisRequestBaseT * __restrict this_ = static_cast< ThisRequestBaseT * >( local.param_ );
                         // Save things
-                        this_->doComplete( &local, false );
-                        this_->eval( runContF( static_cast< ImplementationT * __restrict >( this_ )), &local, &localOpt );
+                        this_->doComplete( &local );
+                        RequestStep step = runContF(static_cast<ImplementationT * __restrict>(this_));
+#ifdef TOOLS_DEBUG
+                        if (step == RequestStepContinue) {
+                            return this_->doContReactor(local, seen);
+                        }
+#endif // TOOLS_DEBUG
+                        this_->eval( step, &local, &localOpt );
                     } else {
-                        local.func_ = &cCont< conter >::f_err;
+                        local.func_ = &cCont< conter >::fErr;
                     }
                     // On to the next step!
                     local.fire( localOpt );
                 }
 
-                TOOLS_NO_INLINE static void f_err( void * param, Error * opt )
+                TOOLS_NO_INLINE static void fErr( void * param, Error * opt )
                 {
                     static_cast< ThisRequestBaseT * >( param )->proxyError( opt, tools::nameOf< cCont< conter >>() );
                 }
@@ -506,19 +317,14 @@ loop:
             };
 
             // Limit code generation by putting this outside the template(s).
-            void proxyError( Error * opt, StringId const & context )
+            void proxyError( Error * opt, StringId const & /*context*/ )
             {
                 TOOLS_ASSERT( !!opt );
                 // TODO: add context to the error to note the path it traveled through.
                 // opt = errInfoAppend( opt, context );
                 Completion local;
                 // Capture the originals
-                doComplete( &local, true );
-#ifdef TOOLS_DEBUG
-                TOOLS_ASSERT( completion_.func_ == local.func_ );
-                completion_.func_ = nullptr;
-#endif // TOOLS_DEBUG
-                local.param_ = completion_.param_;
+                doComplete( &local );
                 // Time to act
                 local.fire( opt );
             }
@@ -535,7 +341,7 @@ loop:
                 ThisRequestBaseT * __restrict this_ = static_cast< ThisRequestBaseT * >( param );
                 Completion local = this_->completion_;
 #ifdef TOOLS_DEBUG
-                this_->completion_.param_ = nullptr;
+                this_->completion_.func_ = nullptr;
 #endif // TOOLS_DEBUG
                 static_cast< Request * >( static_cast< void * >( opt ))->start( local );
             }
@@ -557,9 +363,9 @@ loop:
                 // opt = this_->errInfoAppend( opt, StringIdNull() );
                 Completion local = this_->completion_;
 #ifdef TOOLS_DEBUG
-                this_->completion_.param_ = nullptr;
+                this_->completion_.func_ = nullptr;
 #endif // TOOLS_DEBUG
-                AutoDispose< Error > localOpt( opt );
+                AutoDispose<Error::Reference> localOpt(static_cast<Error::Reference *>(opt));
                 local.fire( localOpt.get() );
             }
         };
@@ -613,6 +419,9 @@ loop:
 
         RequestStep finish( tools::AutoDispose< Error::Reference > && e )
         {
+            if (!e) {
+                return finish();
+            }
             TOOLS_ASSERT(!ThisRequestBaseT::completion_);
             ThisRequestBaseT::completion_ = Completion( &ThisRequestBaseT::notifyError, static_cast< void * >( e.release() ));
             return RequestStepFinishError;
@@ -704,7 +513,7 @@ loop:
         }
 
         template< WaitFunc waiter >
-        void resume( tools::AutoDispose< Error::Reference > && e = nullptr, WaitParam< waiter > *** = 0 )
+        void resume( tools::AutoDispose< Error::Reference > && e, WaitParam< waiter > *** = 0 )
         {
             // TODO: assert that we are suspended
             ThisRequestBaseT::template cWait< waiter >::f(static_cast<void *>(static_cast<ThisRequestBaseT *>(this)), e.release());
@@ -715,7 +524,7 @@ loop:
             // TODO: assert that we are suspended
             Completion local = ThisRequestBaseT::completion_;
 #ifdef TOOLS_DEBUG
-            ThisRequestBaseT::completion_.param_ = nullptr;
+            ThisRequestBaseT::completion_.func_ = nullptr;
 #endif // TOOLS_DEBUG
             local.fire(e);
         }
@@ -740,7 +549,13 @@ loop:
             Completion local = notify;
             ThisRequestBaseT::doStart( local );
             Error * opt = nullptr;
-            ThisRequestBaseT::eval( runRequestStart(), &local, &opt );
+            RequestStep step = runRequestStart();
+#ifdef TOOLS_DEBUG
+            if (step == RequestStepContinue) {
+                return this->doContReactor(local, nullptr);
+            }
+#endif // TOOLS_DEBUG
+            ThisRequestBaseT::eval( step, &local, &opt );
             // All set, do something
             local.fire( opt );
         }
@@ -955,4 +770,133 @@ loop:
             ContPair stepable_;
         };
     };
+
+    // CompletionFanout fires a collection of Completions when fire() is called, which is only allowed to happen
+    // once per instance. New Completions are registered either with join() or, preferably, wrapRequest(). Join()
+    // may fire the Completion synchronously if fire() has already been called.
+    struct CompletionFanout
+        : AllocProhibited
+    {
+        enum : uint64 {
+            completed = 1,
+        };
+        struct Node
+            : AllocStatic<>
+        {
+            Node(Completion const & func) : next_(nullptr), func_(func) {}
+
+            Node * next_;
+            Completion func_;
+        };
+
+        TOOLS_FORCE_INLINE CompletionFanout(void)
+            : pending_(nullptr)
+        {}
+        TOOLS_FORCE_INLINE ~CompletionFanout(void) {
+            TOOLS_ASSERT(!pending_ || hasCompleted());
+        }
+        TOOLS_FORCE_INLINE bool hasCompleted(void) const {
+            return (reinterpret_cast<uint64>(atomicRead(&pending_)) == completed);
+        }
+        TOOLS_FORCE_INLINE void join(Completion const & completion) {
+            auto add = new Node(completion);
+            if (!atomicTryUpdate(&pending_, [add](Node ** node)->bool {
+                bool ret = (*node != reinterpret_cast<Node *>(completed));
+                if (ret) {
+                    add->next_ = *node;
+                    *node = add;
+                }
+                return ret;
+            })) {
+                delete add;
+                completion(err_.get());
+            }
+        }
+        TOOLS_FORCE_INLINE void fire(AutoDispose<Error::Reference> && err) {
+            TOOLS_ASSERT(!hasCompleted());
+            if (!!err) {
+                err_ = err->ref();
+            }
+            Node * local = atomicExchange(&pending_, reinterpret_cast<Node *>(completed));
+            while (!!local) {
+                local->func_.fire(err_.get());
+                auto next = local->next_;
+                delete local;
+                local = next;
+            };
+        }
+        TOOLS_API AutoDispose<Request> maybeWrap(AutoDispose<Request> && = nullptr);
+
+        Node * pending_;
+        AutoDispose<Error::Reference> err_;
+    };
+
+    // A container that locklessly holds multiple concurrent requests. A single AtomicList is
+    // used to store all the Requests that are still in-flight. One benefit of this type is that
+    // it allows fire-and-forget behavior, while still giving a place to find in-flight Requests
+    // in the debugger. Completed Requests are disposed synchronously in the notification. List
+    // nodes are batched for disposal. This does mean that notification requires a list traversal,
+    // and so may incurr performance problems for high frequency Requests.
+    struct MultiRequestOwner
+        : tools::Disposable
+    {
+        // Start the given Request synchronously, so long as stop() has not been called.
+        virtual void start(tools::AutoDispose<tools::Request> &&) = 0;
+        // Start the given Request if stop() has not been called, otherwise pass the Request back.
+        virtual tools::AutoDispose<tools::Request> maybeStart(tools::AutoDispose<tools::Request> &&) = 0;
+        // Return a Request that completes when all current requests have completed. Once this Request
+        // completes, it is safe to dispose this object.
+        virtual tools::AutoDispose<tools::Request> stop(void) = 0;
+    };
+
+    TOOLS_API tools::AutoDispose<MultiRequestOwner> multiRequestOwnerNew(void);
+
+    namespace detail {
+        template<typename FuncT, typename AllocT = tools::AllocDynamic<tools::Inherent>>
+        struct LambdaRequest
+            : tools::StandardRequest<LambdaRequest<FuncT, AllocT>, AllocT>
+        {
+            LambdaRequest(FuncT && func) : func_(std::move(func)) {}
+
+            // StandardRequest
+            tools::RequestStep start(void) override {
+                // TODO: assert no locks held
+                tools::AutoDispose<tools::Error::Reference> err;
+                inner_ = func_(err);
+                if (!!err) {
+                    return this->finish(std::move(err));
+                }
+                return this->maybeWaitFinish(inner_);
+            }
+
+            FuncT func_;
+            tools::AutoDispose<tools::Request> inner_;
+        };
+    }; // detail namespace
+
+    // Factory a Request that executes a given lambda when the request is started. The lambda should have
+    // a signature compatible with:
+    //     [....](AutoDispose<Error::Reference> &)->AutoDispose<Request>
+    //
+    // If calling the lambda results in an Error, the returned Request will synchronously complete with that Error.
+    // Otherwise, if calling the lambda results in a Request, that request will be waited on before completing. In
+    // all other cases, this will complete synchronously without error.
+    template<typename FuncT>
+    tools::AutoDispose<tools::Request> lambdaRequestNew(FuncT && func, tools::Affinity & heap = tools::impl::affinityInstance<tools::Inherent>()) {
+        return new(heap) tools::detail::LambdaRequest<FuncT>(std::move(func));
+    }
+
+    // An alternate factory for lambda Requests that don't need the full interface. The lambda should be compatible
+    // with:
+    //     [....]()->void
+    template<typename FuncT>
+    tools::AutoDispose<tools::Request> simpleLambdaRequestNew(FuncT && func, tools::Affinity & heap = tools::impl::affinityInstance<tools::Inherent>()) {
+        // TODO: used generalized capture to move the func into this lambda
+        return tools::lambdaRequestNew([=](tools::AutoDispose<tools::Error::Reference> &)->tools::AutoDispose<tools::Request> {
+            func();
+            return nullptr;
+        }, heap);
+    }
+
+    TOOLS_API tools::AutoDispose<tools::Request> triggerRequestNew(tools::AutoDispose<> &);
 };  // tools namespace
