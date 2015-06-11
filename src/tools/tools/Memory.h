@@ -18,6 +18,7 @@ namespace tools {
         static TOOLS_FORCE_INLINE void unfetch(void * ptr) {
             _mm_prefetch(static_cast<char const *>(ptr), _MM_HINT_NTA);
         }
+        TOOLS_API bool memoryValidate(void);
     };  // detail namespace
 
     ///

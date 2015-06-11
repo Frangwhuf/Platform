@@ -768,7 +768,9 @@ TestManagementImpl::executeSingle(StringId const & name, tools::unittest::TestCa
         // currentTestName = name;
         // Actually run the test
         testCase.run(test);
+        TOOLS_ASSERTR(tools::detail::memoryValidate());
     }
+    TOOLS_ASSERTR(tools::detail::memoryValidate());
     // TODO: log this
     fprintf(stdout, "[%s] end\n", name.c_str());
     // currentTestName = StringIdNull();

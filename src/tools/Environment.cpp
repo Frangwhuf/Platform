@@ -138,6 +138,7 @@ SimpleEnvironment::~SimpleEnvironment( void )
     services_.erase( item );  // This should cause them to be disposed
   }
   TOOLS_ASSERT( services_.empty() );
+  TOOLS_ASSERT(tools::detail::memoryValidate());
 }
 
 StringId const &
@@ -203,6 +204,7 @@ TwoStageEnvironment::~TwoStageEnvironment()
     services_.erase( item );
   }
   TOOLS_ASSERT( services_.empty() );
+  TOOLS_ASSERT(tools::detail::memoryValidate());
 }
 
 StringId const &

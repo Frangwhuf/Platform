@@ -272,6 +272,12 @@ tools::detail::physicalMemory( void )
     return ret;
 }
 
+bool
+tools::detail::memoryValidate(void)
+{
+    return true;  // don't have a system implemented heap validator
+}
+
 extern "C" void * __libc_calloc( size_t, size_t );
 
 namespace tools {

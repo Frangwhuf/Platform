@@ -264,6 +264,12 @@ globalInfo( void )
     return info_;
 }
 
+bool
+tools::detail::memoryValidate(void)
+{
+    return (!!HeapValidate(globalInfo().heapProcess_, 0, nullptr));
+}
+
 static bool
 enablePrivileges(
     size_t largePageSize,
