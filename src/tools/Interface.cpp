@@ -160,7 +160,7 @@ ResourceTraceImpl::name( void ) const
     }
     // Wait until the end to update name_, so that if two threads are calling name(), we still get the
     // expected result.
-    StringId localName = sample_.name_;
+    StringId localName(sample_.name_);
     if( !localName ) {
         // No name supplied? Use the address.
         TOOLS_ASSERT( !!sample_.site_ );
@@ -434,8 +434,8 @@ impl::resourceTraceBuild(
     // Because we're lazy, we want reuse as much code as possible. In this case we have to cook up a dummy
     // ResourceSample in order to do this. The only field of the ResourceSample that really gets used is
     // size_.
-    StringId localName = name;
-    impl::ResourceSample dummy( nbytes, name );
+    StringId localName(name);
+    impl::ResourceSample dummy( nbytes, name.c_str() );
     ResourceTraceImpl * result = static_cast< ResourceTraceImpl * >( impl::resourceTraceBuild( interval, dummy, target ));
     if( !!target ) {
         boost::format fmt( "%s->%s" );

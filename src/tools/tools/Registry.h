@@ -216,7 +216,7 @@ namespace tools {
     struct RegisterFactoryRegistry
     {
         struct Instance
-            : tools::StandardDisposable< Instance >
+            : tools::StandardDisposable< Instance, tools::Disposable, tools::AllocStatic< Platform >>
         {
             Instance( StringId const & name )
                 : impl_( name )
@@ -247,7 +247,7 @@ namespace tools {
         template< typename FactoryT >
         struct FactoryImpl
             : tools::FactoryRegistry
-            , tools::StandardDisposable< FactoryImpl< FactoryT >>
+            , tools::StandardDisposable< FactoryImpl< FactoryT >, tools::Disposable, tools::AllocStatic<Platform>>
         {
             FactoryImpl( FactoryT const & func )
                 : func_( func )

@@ -394,7 +394,7 @@ namespace tools
     struct StandardPhantomSlistElement
         : PhantomT
     {
-        StandardPhantomSlistElement(void)
+        TOOLS_FORCE_INLINE StandardPhantomSlistElement(void)
         {
             slistNext_.reset( /*tools::FlagPointer< ElementT >::make()*/ nullptr);
         }
@@ -403,9 +403,9 @@ namespace tools
     };
 
     template< typename ElementT >
-    inline void
-        phantomSlistMarkForRemove(
-            ElementT * ref)
+    TOOLS_FORCE_INLINE void
+    phantomSlistMarkForRemove(
+        ElementT * ref)
     {
         atomicTryUpdate(phantomSlistNext(*ref), [](tools::FlagPointer< ElementT > & link)->bool {
             if (isEnd(link)) {
@@ -417,9 +417,9 @@ namespace tools
     }
 
     template< typename ElementT >
-    inline tools::FlagPointer< ElementT > volatile *
-        phantomSlistNext(
-            ElementT & elem)
+    TOOLS_FORCE_INLINE tools::FlagPointer< ElementT > volatile *
+    phantomSlistNext(
+        ElementT & elem)
     {
         return &elem.slistNext_;
     }
@@ -442,16 +442,16 @@ namespace tools
         typedef ElementT ElementType;
         typedef PhantomT PhantomType;
 
-        PhantomSlist(void)
+        TOOLS_FORCE_INLINE PhantomSlist(void)
             : root_(LinkType::make())
         {}
-        ~PhantomSlist(void)
+        TOOLS_FORCE_INLINE ~PhantomSlist(void)
         {
             TOOLS_ASSERT(!root_);  // Should have been cleared previously
         }
 
-        bool
-            operator!(void) const
+        TOOLS_FORCE_INLINE bool
+        operator!(void) const
         {
             return !root_;
         }
@@ -461,9 +461,9 @@ namespace tools
         //    (ElementT const &)->bool
         // Returning false, will stop iteration. This method returns a count of elements visited.
         template< typename VisitF >
-        unsigned
-            peek(
-                VisitF const & func) const
+        TOOLS_FORCE_INLINE unsigned
+        peek(
+            VisitF const & func) const
         {
             TOOLS_ASSERT(tools::phantomVerifyIsCloaked< PhantomT >());
             // Not allowed to remove the root
@@ -482,8 +482,8 @@ namespace tools
         }
 
         // Empty the list, returning a count of the number of elements removed.
-        size_t
-            clear(void)
+        TOOLS_FORCE_INLINE size_t
+        clear(void)
         {
             if (!*this) {
                 // Nothing to remove;
@@ -520,10 +520,10 @@ namespace tools
         // The parameter will be nullptr if the list is empty. If the predicate returns false, the insert is
         // aborted. The method returns a bool indicating if the insert happened.
         template< typename PredicateF >
-        bool
-            push(
-                ElementT * elem,
-                PredicateF const & pred)
+        TOOLS_FORCE_INLINE bool
+        push(
+            ElementT * elem,
+            PredicateF const & pred)
         {
             TOOLS_ASSERT(tools::phantomVerifyIsCloaked< PhantomT >());
             return atomicTryUpdate(&root_, [=](LinkType & ref)->bool {
@@ -539,9 +539,9 @@ namespace tools
         }
 
         // Unconditionally push element to front of list
-        void
-            push(
-                ElementT * elem)
+        TOOLS_FORCE_INLINE void
+        push(
+            ElementT * elem)
         {
             push(elem, [=](LinkType * root)->bool {
                 root->reset(elem);
@@ -558,9 +558,9 @@ namespace tools
         // If 'current' is unchanged, the transform advances to the next node. This method returns a count
         // of the number of elements removed.
         template< typename TransformF >
-        size_t
-            transform(
-                TransformF const & func)
+        TOOLS_FORCE_INLINE size_t
+        transform(
+            TransformF const & func)
         {
             TOOLS_ASSERT(tools::phantomVerifyIsCloaked< PhantomT >());
             size_t ret = 0U;
@@ -654,9 +654,9 @@ namespace tools
         // method returns a count of the elements removed. The signature of the predicate is:
         //     (ElementT const &)->bool
         template< typename PredicateF >
-        size_t
-            removeIf(
-                PredicateF const & func)
+        TOOLS_FORCE_INLINE size_t
+        removeIf(
+            PredicateF const & func)
         {
             if (!*this) {
                 return 0U;
@@ -678,11 +678,11 @@ namespace tools
         //     (ElementT const & elem, ElementT const & current)->bool
         // This can be thought of as semantically equivalent to >.
         template< typename PredicateF >
-        size_t
-            insert(
-                ElementT * elem,
-                bool replace,
-                PredicateF const & comp)
+        TOOLS_FORCE_INLINE size_t
+        insert(
+            ElementT * elem,
+            bool replace,
+            PredicateF const & comp)
         {
             bool complete = false;
             bool entered = false;
@@ -727,11 +727,11 @@ namespace tools
         // This can be thought of as semantically equivalent to >. The removal predicate has the signature:
         //     (ElementT const &)->bool
         template< typename PredicateF, typename ComparatorF >
-        size_t
-            replace(
-                ElementT * elem,
-                PredicateF const & rem,
-                ComparatorF const & comp)
+        TOOLS_FORCE_INLINE size_t
+        replace(
+            ElementT * elem,
+            PredicateF const & rem,
+            ComparatorF const & comp)
         {
             bool complete = false;
             bool entered = false;
@@ -779,10 +779,10 @@ namespace tools
         // Returning true indicates that the given element is equivalent to the update and should be removed.
         // Equivalent elements are assumed to be contiguous in the list.
         template< typename UpdateF, typename PredicateF >
-        void
-            update(
-                UpdateF const & gen,
-                PredicateF const & equiv)
+        TOOLS_FORCE_INLINE void
+        update(
+            UpdateF const & gen,
+            PredicateF const & equiv)
         {
             TOOLS_ASSERT(tools::phantomVerifyIsCloaked< PhantomT >());
             LinkType volatile * iter = &root_;
@@ -850,9 +850,9 @@ namespace tools
     private:
         // Deref a link iterator unless the element has been flagged for removal. In that case, try to
         // remove it and advance the iterator. If the iterator is, itself, marked for removal, reset.
-        LinkType
-            derefCanonicalize(
-                LinkType volatile ** __restrict ref)
+        TOOLS_FORCE_INLINE LinkType
+        derefCanonicalize(
+            LinkType volatile ** __restrict ref)
         {
             LinkType prevUpdate;
             prevUpdate.reset(**ref);
@@ -888,10 +888,10 @@ namespace tools
 
         // Starting from current element, mark all elements in like as end if they pass the given predicate.
         template< typename PredicateF >
-        void
-            replaceAfterIf(
-                ElementT * elem,
-                PredicateF const & pred)
+        TOOLS_FORCE_INLINE void
+        replaceAfterIf(
+            ElementT * elem,
+            PredicateF const & pred)
         {
             while (ElementT * rem = elem) {
                 if (!pred(*rem)) {
@@ -927,12 +927,12 @@ namespace tools
     {
         typedef tools::PhantomSlist< ElementT, PhantomT > BucketT;
 
-        PhantomHashMap(void)
+        TOOLS_FORCE_INLINE PhantomHashMap(void)
             : hashInit_(tools::hashAnyInit< KeyT >())
         {}
 
-        size_t
-            clear(void)
+        TOOLS_FORCE_INLINE size_t
+        clear(void)
         {
             return std::accumulate(buckets_, buckets_ + bucketsUsed, static_cast< size_t >(0U), [](size_t left, BucketT & right)->size_t {
                 return left + right.clear();
@@ -944,9 +944,9 @@ namespace tools
         //    (ElementT const &)->bool
         // Returning false, will stop iteration only on that bucket.
         template< typename VisitorF >
-        void
-            forEach(
-                VisitorF const & visitor) const
+        TOOLS_FORCE_INLINE void
+        forEach(
+            VisitorF const & visitor) const
         {
             std::for_each(buckets_, buckets_ + bucketsUsed, [&](BucketT const & b)->void {
                 b.peek(visitor);
@@ -958,10 +958,10 @@ namespace tools
         //     (ElementT &)->bool
         // Returning false stops the iteration. This method returns a count of elements visited.
         template< typename VisitorF >
-        unsigned
-            forEachKey(
-                KeyT const & __restrict key,
-                VisitorF const & visitor)
+        TOOLS_FORCE_INLINE unsigned
+        forEachKey(
+            KeyT const & __restrict key,
+            VisitorF const & visitor)
         {
             return buckets_[tools::impl::hashAny(key, hashInit_) % bucketsUsed].peek([&key, &visitor](ElementT & __restrict elem)->bool {
                 KeyT const & __restrict elemKeyRef = keyOf(elem);
@@ -971,9 +971,9 @@ namespace tools
 
         // Remove all elements matching a given key. This method returns a count of elements removed, which
         // may include elements not matching the key (differed removal).
-        size_t
-            removeKey(
-                KeyT const & key)
+        TOOLS_FORCE_INLINE size_t
+        removeKey(
+            KeyT const & key)
         {
             return buckets_[tools::impl::hashAny(key, hashInit_) % bucketsUsed].removeIf([&](ElementT & elem)->bool {
                 return (keyOf(elem) == key);
@@ -986,10 +986,10 @@ namespace tools
         // This method returns a count of elements removed, which may include elements not matching the key
         // (differed removal).
         template< typename VisitorF >
-        size_t
-            removeIf(
-                KeyT const & key,
-                VisitorF const & pred)
+        TOOLS_FORCE_INLINE size_t
+        removeIf(
+            KeyT const & key,
+            VisitorF const & pred)
         {
             return buckets_[tools::impl::hashAny(key, hashInit_) % bucketsUsed].removeIf([&](ElementT & elem)->bool {
                 bool ret = false;
@@ -1006,9 +1006,9 @@ namespace tools
         // This method returns a count of elements removed, which may include elements not matching the key
         // (differed removal).
         template< typename VisitorF >
-        size_t
-            removeIf(
-                VisitorF const & visitor)
+        TOOLS_FORCE_INLINE size_t
+        removeIf(
+            VisitorF const & visitor)
         {
             return std::accumulate(buckets_, buckets_ + bucketsUsed, static_cast< size_t >(0U), [&](size_t left, BucketT & right)->size_t {
                 return left + b.removeIf(visitor);
@@ -1016,9 +1016,9 @@ namespace tools
         }
 
         // Remove a specific element (if present). This method returns a count of elements removed.
-        size_t
-            remove(
-                ElementT * rem)
+        TOOLS_FORCE_INLINE size_t
+        remove(
+            ElementT * rem)
         {
             return buckets_[tools::impl::hashAny(keyOf(*rem), hashInit_) % bucketsUsed].removeIf([&](ElementT & elem)->bool {
                 return (&elem == rem);
@@ -1027,10 +1027,10 @@ namespace tools
 
         // Unconditionally insert an element. If replace is true, all existing equivalent elements are
         // removed. Otherwise the equivalent items are left in place.
-        void
-            insert(
-                ElementT * elem,
-                bool replace = false)
+        TOOLS_FORCE_INLINE void
+        insert(
+            ElementT * elem,
+            bool replace = false)
         {
             buckets_[tools::impl::hashAny(keyOf(*elem), hashInit_) % bucketsUsed].insert(elem, replace, [&](ElementT const & left, ElementT const & right)->bool {
                 return (keyOf(left) < keyOf(right));
@@ -1041,10 +1041,10 @@ namespace tools
         // The signature of the predicate is:
         //     (ElementT const &)->bool
         template< typename PredicateF >
-        void
-            replace(
-                ElementT * elem,
-                PredicateF const & pred)
+        TOOLS_FORCE_INLINE void
+        replace(
+            ElementT * elem,
+            PredicateF const & pred)
         {
             buckets_[tools::impl::hashAny(keyOf(*elem), hashInit_) % bucketsUsed].replace(elem, pred, [&](ElementT const & left, ElementT const & right)->bool {
                 return (keyOf(left) < keyOf(right));
@@ -1061,10 +1061,10 @@ namespace tools
         // to evaluate what it wants to do. The signature of the function is:
         //     (ElementT *&)->void
         template< typename UpdateF >
-        void
-            update(
-                KeyT const & key,
-                UpdateF const & gen)
+        TOOLS_FORCE_INLINE void
+        update(
+            KeyT const & key,
+            UpdateF const & gen)
         {
             buckets_[tools::impl::hashAny(key, hashInit_) % bucketsUsed].update([&](ElementT *& ref)->bool {
                 ElementT * prev = ref;
@@ -1090,9 +1090,9 @@ namespace tools
         // for removal are not enumerated. The signature for the function is:
         //     (ElementT const &)->void
         template< typename VisitorF >
-        void
-            forEachUnique(
-                VisitorF const & func)
+        TOOLS_FORCE_INLINE void
+        forEachUnique(
+            VisitorF const & func)
         {
             ElementT * __restrict prev;
             auto wrap = [&](ElementT & elem)->bool {
@@ -1114,10 +1114,10 @@ namespace tools
         //     (ElementT *)->void
         // If no element matches, nullptr will be passed to the visitor.
         template< typename VisitF >
-        void
-            find(
-                KeyT const & key,
-                VisitF const & visitor)
+        TOOLS_FORCE_INLINE void
+        find(
+            KeyT const & key,
+            VisitF const & visitor)
         {
             ElementT * elem = nullptr;
             buckets_[tools::impl::hashAny(key, hashInit_) % bucketsUsed].peek([&](ElementT & __restrict test)->bool {

@@ -701,9 +701,10 @@ namespace tools {
           ResourceSample( size_t size, void * site, ResourceTrace * parent = nullptr )
               : size_( size )
               , site_( site )
+              , name_( nullptr )
               , parent_( parent )
           {}
-          ResourceSample( size_t size, StringId const & name, void * site = nullptr, ResourceTrace * parent = nullptr )
+          ResourceSample( size_t size, char const * name, void * site = nullptr, ResourceTrace * parent = nullptr )
               : size_( size)
               , site_( site )
               , name_( name )
@@ -712,6 +713,7 @@ namespace tools {
           TOOLS_NO_INLINE ResourceSample( size_t size, ResourceTrace * parent = nullptr )
               : size_( size )
               , site_( TOOLS_RETURN_ADDRESS() )
+              , name_( nullptr )
               , parent_( parent )
           {}
 
@@ -721,7 +723,7 @@ namespace tools {
 
           size_t size_;  // Allocation size
           void * site_;  // Function/method that is the source of the allocation.
-          StringId name_;
+          char const * name_;
           ResourceTrace * parent_;  // Parent allocation (if this allocation is contained
                                     // in another).  This may be nullptr for a top-level
                                     // allocation.

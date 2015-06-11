@@ -84,7 +84,7 @@ namespace tools {
 
 #if TOOLS_UNIT_TEST
 
-void testTypeSizes( void )
+TOOLS_TEST_CASE("tools.types", [](Test &)
 {
   TOOLS_ASSERTR( ! boost::is_signed< tools::uchar >::value );
   TOOLS_ASSERTR( sizeof( tools::uchar ) == 1 );
@@ -106,8 +106,6 @@ void testTypeSizes( void )
   TOOLS_ASSERTR( sizeof( tools::uint64 ) == 8 );
   TOOLS_ASSERTR( boost::is_signed< tools::sint64 >::value );
   TOOLS_ASSERTR( sizeof( tools::sint64 ) == 8 );
-}
-
-TOOLS_UNIT_TEST_FUNCTION( testTypeSizes );
+});
 
 #endif /* TOOLS_UNIT_TEST */

@@ -5,6 +5,7 @@
 
 #include <boost/numeric/conversion/cast.hpp>
 
+#include <algorithm>
 #include <unordered_set>
 #include <string.h>
 #include <wchar.h>
@@ -37,10 +38,34 @@ namespace tools {
 
 			StringIdData( void ) = delete;
             StringIdData( char const * str, size_t hsh, size_t len ) : string_( str ), hash_( hsh ), length_( len ) {}
-			TOOLS_FORCE_INLINE bool operator==( StringIdData const & r ) const {
-				return (string_ == r.string_) & (length_ == r.length_);
-			}
+            TOOLS_FORCE_INLINE bool operator==(StringIdData const & r) const {
+                bool ret = (string_ == r.string_);
+                if (!ret) {
+                    ret = (hash_ == r.hash_) && (length_ == r.length_);
+                    if (ret) {
+                        ret = (strncmp(string_, r.string_, length_) == 0);
+                    }
+                } else {
+                    ret = (length_ == r.length_);
+                }
+                return ret;
+            }
+            TOOLS_FORCE_INLINE bool operator<(StringIdData const & r) const {
+                int cmp = strncmp(string_, r.string_, std::min(length_, r.length_));
+                bool ret = (cmp == 0);
+                if (ret) {
+                    ret = (length_ < r.length_);
+                } else {
+                    ret = (cmp < 0);
+                }
+                return ret;
+            }
         };
+
+        TOOLS_FORCE_INLINE uint32 defineHashAny(StringIdData const & sid, uint32)
+        {
+            return static_cast<uint32>(sid.hash_ & 0xFFFFFFFF);
+        }
     };  // namespace impl
 
     TOOLS_API StringId StaticStringId( char const * ) throw();
@@ -53,57 +78,61 @@ namespace tools {
 #endif // STRINGID_DEBUGGING
         TOOLS_API void fillInStringId( char const *, sint32 ) throw();
         friend StringId tools::StaticStringId( char const * ) throw();
-        StringId( impl::StringIdData * data )
+        TOOLS_FORCE_INLINE StringId( impl::StringIdData * data )
             : data_( data )
 #ifdef STRINGID_DEBUGGING
             , thisPointer_( this )
 #endif // STRINGID_DEBUGGING
         {}
     public:
-        StringId( void ) throw()
+        TOOLS_FORCE_INLINE StringId( void ) throw()
             : data_( nullptr )
 #ifdef STRINGID_DEBUGGING
             , thisPointer_( this )
 #endif // STRINGID_DEBUGGING
         {}
-        StringId( char const * str, sint32 cnt = -1 ) throw() { fillInStringId( str, cnt ); }
+        TOOLS_FORCE_INLINE StringId( char const * str, sint32 cnt = -1 ) throw() { fillInStringId( str, cnt ); }
         TOOLS_API StringId( StringId const & ) throw();
-        StringId( std::string const & str ) throw() { fillInStringId( str.c_str(), boost::numeric_cast<sint32>(str.length()) ); }
+        TOOLS_FORCE_INLINE StringId( std::string const & str ) throw() { fillInStringId( str.c_str(), boost::numeric_cast<sint32>(str.length()) ); }
         TOOLS_API ~StringId( void ) throw();
-        inline StringId & operator=( StringId const & sid ) throw() {
+        TOOLS_FORCE_INLINE StringId & operator=( StringId const & sid ) throw() {
             return copy( sid );
         }
-        inline bool operator==( StringId const & sid ) const throw() {
-            return data_ == sid.data_;
+        TOOLS_FORCE_INLINE bool operator==( StringId const & sid ) const throw() {
+            bool ret = (data_ == sid.data_);
+            if (!ret && !!data_ && !!sid.data_) {
+                ret = (*data_ == *sid.data_);
+            }
+            return ret;
         }
-        inline bool operator!=( StringId const & sid ) const throw() {
-            return data_ != sid.data_;
+        TOOLS_FORCE_INLINE bool operator!=( StringId const & sid ) const throw() {
+            return !operator==(sid);
         }
-        inline bool operator==( char const * str ) const throw() {
+        TOOLS_FORCE_INLINE bool operator==( char const * str ) const throw() {
             if( !data_ ) {
                 return !str;
             }
             return strcmp( data_->string_, str ) == 0;
         }
-        inline bool operator!=( char const * str ) const throw() {
+        TOOLS_FORCE_INLINE bool operator!=( char const * str ) const throw() {
             if( !data_ ) {
                 return !!str;
             }
             return strcmp( data_->string_, str ) != 0;
         }
-        inline bool operator==( std::string const & str ) const throw() {
+        TOOLS_FORCE_INLINE bool operator==( std::string const & str ) const throw() {
             if( !data_ ) {
                 return false;
             }
             return str == data_->string_;
         }
-        inline bool operator!=( std::string const & str ) const throw() {
+        TOOLS_FORCE_INLINE bool operator!=( std::string const & str ) const throw() {
             if( !data_ ) {
                 return true;
             }
             return str != data_->string_;
         }
-        inline sint32 compareTo( StringId const & str ) const throw() {
+        TOOLS_FORCE_INLINE sint32 compareTo( StringId const & str ) const throw() {
             if( !str.data_ ) {
                 return ( !data_ ? 0 : 1 );
             }
@@ -112,7 +141,7 @@ namespace tools {
             }
             return strcmp( data_->string_, str.data_->string_ );
         }
-        inline sint32 compareTo( char const * str ) const throw() {
+        TOOLS_FORCE_INLINE sint32 compareTo( char const * str ) const throw() {
             if( !str ) {
                 return ( !data_ ? 0 : 1 );
             }
@@ -121,13 +150,13 @@ namespace tools {
             }
             return strcmp( data_->string_, str );
         }
-        inline sint32 compareTo( std::string const & str ) const throw() {
+        TOOLS_FORCE_INLINE sint32 compareTo( std::string const & str ) const throw() {
             if( !data_ ) {
                 return -1;
             }
             return strcmp( data_->string_, str.c_str() );  // TODO: look at std::string interface for better way of doing this
         }
-        inline sint32 compareToIgnoreCase( StringId const & str ) const throw() {
+        TOOLS_FORCE_INLINE sint32 compareToIgnoreCase( StringId const & str ) const throw() {
             if( !str.data_ ) {
                 return ( !data_ ? 0 : 1 );
             }
@@ -136,7 +165,7 @@ namespace tools {
             }
             return strcasecmp( data_->string_, str.data_->string_ );
         }
-        inline sint32 compareToIgnoreCase( char const * str ) const throw() {
+        TOOLS_FORCE_INLINE sint32 compareToIgnoreCase( char const * str ) const throw() {
             if( !str ) {
                 return ( !data_ ? 0 : 1 );
             }
@@ -145,22 +174,22 @@ namespace tools {
             }
             return strcasecmp( data_->string_, str );
         }
-        inline sint32 compareToIgnoreCase( std::string const & str ) const throw() {
+        TOOLS_FORCE_INLINE sint32 compareToIgnoreCase( std::string const & str ) const throw() {
             if( !data_ ) {
                 return -1;
             }
             return strcasecmp( data_->string_, str.c_str() ); // TODO: look at the std::string interface for a better way of doing this
         }
-        inline bool operator<( StringId const & sid ) const throw() {
+        TOOLS_FORCE_INLINE bool operator<( StringId const & sid ) const throw() {
             return compareTo( sid ) < 0;
         }
-        inline bool operator<( char const * str ) const throw() {
+        TOOLS_FORCE_INLINE bool operator<( char const * str ) const throw() {
             return compareTo( str ) < 0;
         }
-        inline bool operator<( std::string const & str ) const throw() {
+        TOOLS_FORCE_INLINE bool operator<( std::string const & str ) const throw() {
             return compareTo( str ) < 0;
         }
-        inline char const * c_str( void ) const throw() {
+        TOOLS_FORCE_INLINE char const * c_str( void ) const throw() {
 #ifdef STRINGID_DEBUGGING
             TOOLS_ASSERT( thisPointer_ == this );
 #endif // STRINGID_DEBUGGING
@@ -170,16 +199,16 @@ namespace tools {
             return data_->string_;
         }
         TOOLS_API StringId & copy( StringId const & );
-        inline bool operator!( void ) const throw() {
+        TOOLS_FORCE_INLINE bool operator!( void ) const throw() {
             return !data_;
         }
-        inline size_t length( void ) const throw() {
+        TOOLS_FORCE_INLINE size_t length( void ) const throw() {
             if( !data_ ) {
                 return 0;
             }
             return data_->length_;
         }
-        inline size_t hash( void ) const throw() {
+        TOOLS_FORCE_INLINE size_t hash( void ) const throw() {
             if( !data_ ) {
                 return 0;
             }
@@ -187,27 +216,27 @@ namespace tools {
         }
     };
 
-    inline bool operator==( char const * str, StringId const & sid ) {
+    TOOLS_FORCE_INLINE bool operator==( char const * str, StringId const & sid ) {
         return sid == str;
     }
 
-    inline bool operator==( std::string const & str, StringId const & sid ) {
+    TOOLS_FORCE_INLINE bool operator==( std::string const & str, StringId const & sid ) {
         return sid == str;
     }
 
-    inline bool operator!=( char const * str, StringId const & sid ) {
+    TOOLS_FORCE_INLINE bool operator!=( char const * str, StringId const & sid ) {
         return sid != str;
     }
 
-    inline bool operator!=( std::string const & str, StringId const & sid ) {
+    TOOLS_FORCE_INLINE bool operator!=( std::string const & str, StringId const & sid ) {
         return sid != str;
     }
 
-    inline bool operator<( char const * str, StringId const & sid ) {
+    TOOLS_FORCE_INLINE bool operator<( char const * str, StringId const & sid ) {
         return sid.compareTo( str ) > 0;
     }
 
-    inline bool operator<( std::string const & str, StringId const & sid ) {
+    TOOLS_FORCE_INLINE bool operator<( std::string const & str, StringId const & sid ) {
         return sid.compareTo( str ) > 0;
     }
 
@@ -218,7 +247,7 @@ namespace tools {
     // TOOLS_API StringId Widen( char const *, sint32 = -1 );
     // TOOLS_API StringId Widen( std::string const & );
 
-    inline std::ostream & operator<<( std::ostream & stream, StringId const & str ) {
+    TOOLS_FORCE_INLINE std::ostream & operator<<( std::ostream & stream, StringId const & str ) {
         return ( !!str ? ( stream << str.c_str() ) : ( stream << "(NULL)" ) );
     }
 

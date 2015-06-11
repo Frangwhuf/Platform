@@ -1365,26 +1365,20 @@ TestAssetSingleton::pendingDispose( AutoDispose<> & disp )
 // Tests
 ////////
 
-void
-TestTestAssetRootCreate( void )
+TOOLS_TEST_CASE("Asset.create", [](Test &)
 {
     AutoDispose< TestAssetRoot > root( new TestAssetRoot() );
-}
+});
 
-TOOLS_UNIT_TEST_FUNCTION( TestTestAssetRootCreate );
-
-void
-TestSingleAssetCreate( void )
+TOOLS_TEST_CASE("Asset.sinble.create", [](Test &)
 {
     AutoDispose< TestAssetRoot > root( new TestAssetRoot() );
     {
         AutoDispose< Asset > asset( root->load( "foo" ));
-        TOOLS_ASSERT( !!asset );
-        TOOLS_ASSERT( asset->status() == detail::AssetStateReady );
+        TOOLS_ASSERTR( !!asset );
+        TOOLS_ASSERTR( asset->status() == detail::AssetStateReady );
     }
     root->setState( detail::AssetStateDying );
-}
-
-TOOLS_UNIT_TEST_FUNCTION( TestSingleAssetCreate );
+});
 
 #endif // TOOLS_UNIT_TEST

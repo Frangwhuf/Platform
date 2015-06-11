@@ -150,25 +150,6 @@ namespace tools {
   }; // namespace unittest
 }; // namespace tools
 
-/// \def TOOLS_UNIT_TEST_FUNCTION
-/// Creates a unit test to call a test function
-/// \param func The function to be run.
-#define TOOLS_UNIT_TEST_FUNCTION( func ) \
-namespace { \
-  template< int line > \
-  struct FuncFactoryImpl ## func; \
-  template<> \
-  struct FuncFactoryImpl ## func< __LINE__ > \
-  { \
-    typedef FuncFactoryImpl ## func< __LINE__ > Type; \
-    FuncFactoryImpl ## func( void ) { tools::unittest::FuncTestFactory< Type, &  func >::createTest(); } \
-    static tools::StringId Name( void ) { return tools::StringId( #func ); } \
-    static tools::StringId File( void ) { return tools::StringId( __FILE__ ); } \
-    static Type factory_; \
-  }; \
-  FuncFactoryImpl ## func< __LINE__ > FuncFactoryImpl ## func< __LINE__ >::factory_; \
-}; // anonymous namespace
-
 /// \def TOOLS_UNIT_TEST_METHOD
 /// Creates a unit test to call a test method.  The test class will be
 /// constructed and destructed for each test method.
@@ -276,7 +257,7 @@ namespace tools {
 		// The actual inner implementation for a test case.
 		template<typename TestBodyT>
 		struct TestCaseImplementation
-			: tools::StandardDisposable<TestCaseImplementation<TestBodyT>, tools::unittest::DisposableTestCase>
+			: tools::StandardDisposable<TestCaseImplementation<TestBodyT>, tools::unittest::DisposableTestCase, tools::AllocStatic<Platform>>
 		{
 			explicit TestCaseImplementation(TestBodyT const & f)
 				: func_(f)
@@ -309,7 +290,7 @@ namespace tools {
 		// An implementation for a parameterized test case.
 		template<typename TestBodyT, typename... ParameterT>
 		struct ParameterizedTestCaseImplementation
-			: tools::StandardDisposable<ParameterizedTestCaseImplementation<TestBodyT, ParameterT...>, tools::unittest::DisposableTestCase>
+			: tools::StandardDisposable<ParameterizedTestCaseImplementation<TestBodyT, ParameterT...>, tools::unittest::DisposableTestCase, tools::AllocStatic<Platform>>
 		{
 			ParameterizedTestCaseImplementation(TestBodyT func, std::tuple<ParameterT...> parameters)
 				: parameters_(parameters)
@@ -337,7 +318,7 @@ namespace tools {
 		// the name: name/index
 		template<typename GeneratorT, typename TestBodyT>
 		struct ParameterizedTestRegistration
-			: tools::StandardDisposable<ParameterizedTestRegistration<GeneratorT, TestBodyT>>
+			: tools::StandardDisposable<ParameterizedTestRegistration<GeneratorT, TestBodyT>, tools::Disposable, tools::AllocStatic<Platform>>
 		{
 			ParameterizedTestRegistration(tools::StringId const & name, GeneratorT gen, TestBodyT func)
 			{
@@ -361,12 +342,12 @@ namespace tools {
 				return tools::AutoDisposePair<tools::unittest::TestCase>(new ParameterizedTestCaseImplementation<TestBodyT, ParameterT...>(func, params));
 			}
 
-			std::list<tools::AutoDisposePair<tools::unittest::TestCase>, tools::AllocatorAffinity<tools::AutoDisposePair<tools::unittest::TestCase>>> tests_;
-			std::list<tools::AutoDispose<>, tools::AllocatorAffinity<tools::AutoDispose<>>> registrations_;
+			std::list<tools::AutoDisposePair<tools::unittest::TestCase>, tools::AllocatorAffinity<tools::AutoDisposePair<tools::unittest::TestCase>, Platform>> tests_;
+			std::list<tools::AutoDispose<>, tools::AllocatorAffinity<tools::AutoDispose<>, Platform>> registrations_;
 		};
 
 		struct DisabledTestCaseImplementation
-			: tools::StandardDisposable<DisabledTestCaseImplementation, tools::unittest::DisposableTestCase>
+			: tools::StandardDisposable<DisabledTestCaseImplementation, tools::unittest::DisposableTestCase, tools::AllocStatic<Platform>>
 		{
 			DisabledTestCaseImplementation(RegisterTestFunctor & parent, char const * const reason)
 				: parent_(parent)

@@ -495,8 +495,9 @@ namespace tools {
                 // are present if the affinity uses VerifyAffinity.
                 tools::Affinity & aff = tools::impl::affinityInstance< AffinityT >();
                 // Useful name for memory tracking
-                tools::StringId name = tools::nameOf< ElementPool< ElementT, AffinityT >>();
-                tools::Pool * ret = &aff.pool( std::max( sizeof( size_t ), sizeof( ElementT )), impl::ResourceSample( sizeof( ElementT ), name ));
+                // TODO: fix infinite loop
+                // tools::StringId name = tools::nameOf< ElementPool< ElementT, AffinityT >>();
+                tools::Pool * ret = &aff.pool( std::max( sizeof( size_t ), sizeof( ElementT )), impl::ResourceSample( sizeof( ElementT ), /*name.c_str()*/"ElementPool< ElementT, AffinityT >" ));
                 tools::atomicCas< tools::Pool *, tools::Pool * >( storage(), nullptr, ret );
                 return **storage();
             }
@@ -700,7 +701,7 @@ namespace tools {
             }
             return static_cast< typename std::allocator< ElementT >::pointer >(
                 tools::impl::affinityRef< AffinityT >().map( allocSize, tools::impl::ResourceSample( allocSize,
-                    tools::nameOf< AllocatorAffinity< ElementT, AffinityTraitsT >>() )));
+                    tools::nameOf< AllocatorAffinity< ElementT, AffinityTraitsT >>().c_str() )));
         }
         void
         deallocate(

@@ -3241,7 +3241,7 @@ VerifyStaticMonitor::VerifyStaticMonitor(
     Monitor::Policy policy )
     : inner_( std::move( inner ))
     , trace_( impl::resourceTraceBuild( res ))
-    , stereotype_( !IsNullOrEmptyStringId( stereotype ) ? stereotype : "static" )
+    , stereotype_( /*!IsNullOrEmptyStringId( stereotype ) ? stereotype : "static"*/stereotype )  // TODO: fix the infinite initialization loop here
     , policy_( policy )
     , everRealTime_( false )
     , prevRealTime_( false )

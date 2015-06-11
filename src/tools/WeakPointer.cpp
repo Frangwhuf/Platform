@@ -13,7 +13,7 @@ using namespace tools;
 
 namespace {
     struct PhantomSequence
-        : AllocPool<PhantomSequence>
+        : AllocPool<PhantomSequence, Platform>
     {
         PhantomSequence( void );
         ~PhantomSequence( void );
@@ -120,16 +120,27 @@ namespace {
 
         PhantomSequenceLocal seqsUniversal_;
         PhantomSequenceLocal seqsRealTime_;
+
+        static PhantomSequenceRoot universalRoot_;
+        static PhantomSequenceRoot realTimeRoot_;
     };
+
+    typedef StandardThreadLocalHandle< PhantomCloakLocal > PhantomThreadLocal;
+
+    PhantomThreadLocal &
+    getPhantomThreadLocal(void)
+    {
+        static PhantomThreadLocal local_;
+        return local_;
+    }
 };  // anonymous namespace
 
 //////////
 // Statics
 //////////
 
-static PhantomSequenceRoot universalRoot_;
-static PhantomSequenceRoot realTimeRoot_;
-static StandardThreadLocalHandle< PhantomCloakLocal > phantomCloakLocal_;
+PhantomSequenceRoot PhantomCloakLocal::universalRoot_;
+PhantomSequenceRoot PhantomCloakLocal::realTimeRoot_;
 
 ///////////////////////
 // Non-member Functions
@@ -138,25 +149,25 @@ static StandardThreadLocalHandle< PhantomCloakLocal > phantomCloakLocal_;
 PhantomCloak &
 tools::definePhantomLocal( PhantomUniversal *** )
 {
-    return static_cast< PhantomUniversalBase & >( *phantomCloakLocal_ );
+    return static_cast< PhantomUniversalBase & >(*getPhantomThreadLocal());
 }
 
 PhantomPrototype &
 tools::definePhantomPrototype( PhantomUniversal *** )
 {
-    return static_cast< PhantomUniversalBase & >( *phantomCloakLocal_ );
+    return static_cast< PhantomUniversalBase & >(*getPhantomThreadLocal());
 }
 
 PhantomCloak &
 tools::definePhantomLocal( PhantomRealTime *** )
 {
-    return static_cast< PhantomRealTimeBase & >( *phantomCloakLocal_ );
+    return static_cast< PhantomRealTimeBase & >(*getPhantomThreadLocal());
 }
 
 PhantomPrototype &
 tools::definePhantomPrototype( PhantomRealTime *** )
 {
-    return static_cast< PhantomRealTimeBase & >( *phantomCloakLocal_ );
+    return static_cast< PhantomRealTimeBase & >(*getPhantomThreadLocal());
 }
 
 //////////////////

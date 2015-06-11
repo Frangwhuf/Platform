@@ -19,6 +19,8 @@
 using namespace tools;
 using boost::numeric_cast;
 
+#define SHINEY_NEW_STRINGID
+
 namespace {
     static uint64 volatile totalStringIds_ = 0ULL;
     static uint64 volatile totalStaticStringIds_ = 0ULL;
@@ -39,60 +41,8 @@ namespace tools {
     };  // impl namespace
 };  // tools namespace
 
-namespace std {
-    template<>
-    struct hash< tools::impl::StringIdData * >
-    {
-        size_t operator()( tools::impl::StringIdData * ptr ) const
-        {
-            return ptr->hash_;
-        }
-    };
-
-    template<>
-    struct equal_to< tools::impl::StringIdData * >
-    {
-        bool operator()( tools::impl::StringIdData * ptr1, tools::impl::StringIdData * ptr2 ) const
-        {
-			bool ret = ( ptr1 == ptr2 );
-            if( ret ) { return ret; }
-			return ( strcmp( ptr1->string_, ptr2->string_ ) == 0 );
-        }
-    };
-}; // namespace std
-
-typedef std::unordered_set< tools::impl::StringIdData * > StringTable;
-
 namespace {
-    static StringTable & GetStringTable( void ) throw()
-    {
-        static StringTable * table = new StringTable;
-        return *table;
-    }
-
-    struct RealStringId : tools::impl::StringIdData
-    {
-        typedef StringTable::iterator Iterator;
-        bool isStatic_;
-        uint32 refs_;
-
-		RealStringId( void ) = delete;
-        RealStringId( char const * str, size_t hsh, size_t len, bool isStatic )
-            : tools::impl::StringIdData( str, hsh, len )
-            , isStatic_( isStatic )
-            , refs_( 0 )
-        {}
-    };
-
-    inline char const * CopyStringContents( char const * inStr, uint32 copyChars )
-    {
-        char * ret = new char[ copyChars + 1 ];
-        memcpy( ret, inStr, copyChars * sizeof( char ) );
-        ret[ copyChars ] = '\0';
-        return ret;
-    }
-
-    inline size_t StringHash( char const * str, uint32 size )
+    TOOLS_FORCE_INLINE size_t stringHash( char const * str, uint32 size )
     {
         size_t ret = 0;
         char const * end = str + size;
@@ -102,62 +52,59 @@ namespace {
         return ret;
     }
 
-    inline RealStringId * CreateRecord( char const * str, uint32 len, uint32 alloc, bool isStatic )
+    TOOLS_FORCE_INLINE char const * copyStringContents( char const * inStr, uint32 copyChars )
     {
-        size_t hsh = StringHash( str, alloc-1 );
-        RealStringId * ret = new RealStringId( str, hsh, len, isStatic );
+        char * ret = new char[ copyChars + 1 ];
+        memcpy( ret, inStr, copyChars * sizeof( char ) );
+        ret[ copyChars ] = '\0';
         return ret;
     }
-
-    inline void DestroyRecord( RealStringId * sid )
-    {
-        if( !( sid->isStatic_ ) ) {
-            delete [] sid->string_;
-        }
-        delete sid;
-    }
-
-    inline void AddToTable( RealStringId * sid )
-    {
-        // TODO: get a lock for the table
-        auto resp = GetStringTable().insert( sid );
-        TOOLS_ASSERT( resp.second );
-    }
-
-    inline void RemoveFromTable( RealStringId * sid )
-    {
-        // TODO: get a lock for the table
-        TOOLS_ASSERT( sid->refs_ == 0 );
-        GetStringTable().erase( sid );
-    }
-
 	struct NewStringIdData
 		: tools::impl::StringIdData
+        , Referenced<NewStringIdData>
 	{
-		bool isStatic_;
-
-		NewStringIdData( void ) = delete;
-		TOOLS_FORCE_INLINE NewStringIdData( char const * str, size_t hsh, size_t len, bool stat )
-			: tools::impl::StringIdData( str, hsh, len )
-			, isStatic_( stat )
-		{}
-		TOOLS_FORCE_INLINE NewStringIdData( tools::impl::StringIdData const & data, bool stat )
-			: tools::impl::StringIdData( data )
-			, isStatic_( stat )
-		{}
+        NewStringIdData(void) : tools::impl::StringIdData(nullptr, 0, 0), isStatic_(false), generation_(0) {}
 		TOOLS_FORCE_INLINE bool operator==( NewStringIdData const & r ) const {
-			return tools::impl::StringIdData::operator==( r ) & ( isStatic_ == r.isStatic_ );
+			return tools::impl::StringIdData::operator==( r );
 		}
+        TOOLS_FORCE_INLINE void populate(char const * str, size_t hsh, size_t len, bool stat, uint64 gen)
+        {
+            *static_cast<tools::impl::StringIdData *>(this) = tools::impl::StringIdData(str, hsh, len);
+            isStatic_ = stat;
+            generation_ = gen;
+        }
+        TOOLS_FORCE_INLINE void populate(tools::impl::StringIdData const & data, bool stat, uint64 gen)
+        {
+            *static_cast<tools::impl::StringIdData *>(this) = data;
+            isStatic_ = stat;
+            generation_ = gen;
+        }
+
+		bool isStatic_;
+        uint64 generation_;
 	};
 
 	struct NewRealStringId
-		: StandardIsReferenced< NewRealStringId, NewStringIdData, AllocStatic< Platform >>
-	{};
+		: StandardReferenced< NewRealStringId, NewStringIdData, AllocStatic< Platform >>
+	{
+        NewRealStringId(void) = default;
+        TOOLS_FORCE_INLINE NewRealStringId(char const * str, size_t hsh, size_t len, bool stat, uint64 gen)
+        {
+            populate(str, hsh, len, stat, gen);
+        }
+        TOOLS_FORCE_INLINE NewRealStringId(tools::impl::StringIdData const & data, bool stat, uint64 gen)
+        {
+            populate(data, stat, gen);
+        }
+    };
 
 	struct StringPhantom
 		: StandardPhantomSlistElement< StringPhantom, StandardPhantom< StringPhantom, AllocStatic< Platform >>>
 	{
-		AutoDispose<NewRealStringId> data_;
+        StringPhantom(AutoDispose<NewRealStringId::Reference> & r, uint64 c = 1U) : data_(r->ref()), count_(c) {}
+
+		AutoDispose<NewRealStringId::Reference> data_;
+        uint64 count_;
 	};
 
 	TOOLS_FORCE_INLINE tools::impl::StringIdData const &
@@ -173,11 +120,43 @@ namespace {
 
 	typedef PhantomHashMap< StringPhantom, tools::impl::StringIdData, PhantomUniversal > NewStringTable;
 
-	static TOOLS_FORCE_INLINE NewStringTable & GetNewStringTable(void) throw()
+    struct TablePair
+        : AllocStatic< Platform >
+    {
+        NewStringTable * table_;
+        uint64 generation_;
+    };
+
+	static TOOLS_FORCE_INLINE TablePair getNewStringTable(void) throw()
 	{
-		static NewStringTable * table = new NewStringTable;
-		return *table;
+        static AtomicAny<TablePair, true> table;
+        // First make sure the table exists.
+        atomicTryUpdate(&table, [](TablePair & element)->bool {
+            bool result = !element.table_;
+            if (result) {
+                element.table_ = new NewStringTable();
+            }
+            return result;
+        });
+        // Next increment the generation
+        TablePair ret;
+        atomicUpdate(&table, [&ret](TablePair element)->TablePair {
+            ++element.generation_;
+            ret = element;
+            return element;
+        });
+        return ret;
 	}
+
+    TOOLS_FORCE_INLINE AutoDispose<NewRealStringId::Reference> createRecord(
+        char const * str,
+        uint32 len,
+        uint32 alloc,
+        bool isStatic)
+    {
+        size_t hsh = stringHash(str, alloc - 1);
+        return new NewRealStringId(str, hsh, len, isStatic, 0);
+    }
 }; // anonymous namespace
 
 void
@@ -194,64 +173,107 @@ StringId::fillInStringId( char const * inStr, sint32 count ) throw()
         TOOLS_ASSERT( count > 0 );
         len = numeric_cast<uint32>(count);
     }
-    RealStringId * sid = CreateRecord( CopyStringContents( inStr, numeric_cast<uint32>(len) ), numeric_cast<uint32>(len), numeric_cast<uint32>(len+1), false );
-    StringTable::iterator i = GetStringTable().find( sid );
-    if( i == GetStringTable().end() ) {
-        AddToTable( sid );
-        atomicIncrement( &totalStringIds_ );
-        atomicAdd( &totalStringBytes_, sid->length_ );
-        data_ = static_cast< tools::impl::StringIdData * >( sid );
-    } else {
-        data_ = *i;
-        DestroyRecord( sid );
+    AutoDispose<NewRealStringId::Reference> sid(createRecord(copyStringContents(inStr, numeric_cast<uint32>(len)), numeric_cast<uint32>(len), numeric_cast<uint32>(len + 1), false));
+    AutoDispose<NewRealStringId::Reference> found;
+    {
+        auto table = getNewStringTable();
+        sid->generation_ = table.generation_;
+        AutoDispose<> proto(phantomTryBindPrototype<PhantomUniversal>());
+        table.table_->update(*sid, [&](StringPhantom *& old)->void {
+            if (!old || ((sid->generation_ < old->data_->generation_) && !old->data_->isStatic_)) {
+                old = new StringPhantom(sid);
+            } else {
+                old = new StringPhantom(old->data_, old->count_ + 1);
+            }
+            found = old->data_->ref();
+        });
     }
-    atomicIncrement( &static_cast< RealStringId * >( data_ )->refs_ );
+    TOOLS_ASSERT(!!found);
+    data_ = found.release();
 }
 
 StringId::StringId( StringId const & c ) throw()
 {
-    data_ = c.data_;
-    if( !!data_ ) {
-        atomicIncrement( &static_cast< RealStringId * >( data_ )->refs_ );
+    if (!c.data_) {
+        data_ = nullptr;
+    } else {
+        AutoDispose<NewRealStringId::Reference> sid(static_cast<NewRealStringId *>(c.data_)->ref());
+        AutoDispose<NewRealStringId::Reference> found;
+        {
+            auto table = getNewStringTable();
+            AutoDispose<> proto(phantomTryBindPrototype<PhantomUniversal>());
+            table.table_->update(*sid, [&](StringPhantom *& old)->void {
+                if (!old || ((sid->generation_ < old->data_->generation_) && !old->data_->isStatic_)) {
+                    old = new StringPhantom(sid);
+                } else {
+                    old = new StringPhantom(old->data_, old->count_ + 1);
+                }
+                found = old->data_->ref();
+            });
+        }
+        TOOLS_ASSERT(!!found);
+        data_ = found.release();
     }
 }
 
 StringId::~StringId( void ) throw()
 {
-    if( !!data_ ) {
-        if( !atomicDecrement( &static_cast< RealStringId * >( data_ )->refs_ )) {
-            RemoveFromTable( static_cast< RealStringId * >( data_ ));
-            if( static_cast< RealStringId * >( data_ )->isStatic_ ) {
-                atomicDecrement( &totalStaticStringIds_ );
-            } else {
-                atomicDecrement( &totalStringIds_ );
-                atomicSubtract( &totalStringBytes_, static_cast< RealStringId * >( data_ )->length_ );
+    AutoDispose<NewRealStringId::Reference> sid(static_cast<NewRealStringId::Reference *>(data_));
+    if (!!sid) {
+        auto table = getNewStringTable();
+        AutoDispose<> proto(phantomTryBindPrototype<PhantomUniversal>());
+        table.table_->update(*sid, [&](StringPhantom *& old)->void {
+            if (!!old && (old->data_ == sid) && (old->data_->generation_ == sid->generation_)) {
+                if (old->count_ == 1U) {
+                    old = nullptr;
+                } else {
+                    old = new StringPhantom(old->data_, old->count_ - 1);
+                }
             }
-            TOOLS_ASSERT( static_cast< RealStringId * >( data_ )->refs_ == 0 );  // make sure no one has refed it up again
-            DestroyRecord( static_cast< RealStringId * >( data_ ) );
-        }
+        });
     }
     data_ = nullptr;
 }
 
 StringId & StringId::copy( StringId const & c )
 {
-    if( !!data_ ) {
-        if( !atomicDecrement( &static_cast< RealStringId * >( data_ )->refs_ )) {
-            RemoveFromTable( static_cast< RealStringId * >( data_ ));
-            if( static_cast< RealStringId * >( data_ )->isStatic_ ) {
-                atomicDecrement( &totalStaticStringIds_ );
-            } else {
-                atomicDecrement( &totalStringIds_ );
-                atomicSubtract( &totalStringBytes_, static_cast< RealStringId * >( data_ )->length_ );
-            }
-            TOOLS_ASSERT( static_cast< RealStringId * >( data_ )->refs_ == 0 );  // make sure no one has refed it up again
-            DestroyRecord( static_cast< RealStringId * >( data_ ) );
+    // First release the current data
+    {
+        AutoDispose<NewRealStringId::Reference> sid(static_cast<NewRealStringId::Reference *>(data_));
+        if (!!sid) {
+            auto table = getNewStringTable();
+            AutoDispose<> proto(phantomTryBindPrototype<PhantomUniversal>());
+            table.table_->update(*sid, [&](StringPhantom *& old)->void {
+                if (!!old && (old->data_ == sid) && (old->data_->generation_ == sid->generation_)) {
+                    if (old->count_ == 1U) {
+                        old = nullptr;
+                    } else {
+                        old = new StringPhantom(old->data_, old->count_ - 1);
+                    }
+                }
+            });
         }
     }
-    data_ = c.data_;
-    if( !!data_ ) {
-        atomicIncrement( &static_cast< RealStringId * >( data_ )->refs_ );
+    // Then reference the new one
+    if (!c.data_) {
+        data_ = nullptr;
+    } else {
+        AutoDispose<NewRealStringId::Reference> sid(static_cast<NewRealStringId *>(c.data_)->ref());
+        AutoDispose<NewRealStringId::Reference> found;
+        {
+            auto table = getNewStringTable();
+            AutoDispose<> proto(phantomTryBindPrototype<PhantomUniversal>());
+            table.table_->update(*sid, [&](StringPhantom *& old)->void {
+                if (!old || ((sid->generation_ < old->data_->generation_) && !old->data_->isStatic_)) {
+                    old = new StringPhantom(sid);
+                } else {
+                    old = new StringPhantom(old->data_, old->count_ + 1);
+                }
+                found = old->data_->ref();
+            });
+        }
+        TOOLS_ASSERT(!!found);
+        data_ = found.release();
     }
     return *this;
 }
@@ -322,26 +344,23 @@ bool tools::IsNullOrEmptyStringId( StringId const & str )
 StringId tools::StaticStringId( char const * inStr ) throw()
 {
     size_t len = strlen( inStr );
-    RealStringId * sid = CreateRecord( inStr, numeric_cast<uint32>(len), numeric_cast<uint32>(len+1), true );
-    StringTable::iterator i = GetStringTable().find( sid );
-    if( i == GetStringTable().end() ) {
-        AddToTable( sid );
-        atomicIncrement( &totalStaticStringIds_ );
-    } else {
-        DestroyRecord( sid );
-        sid = static_cast< RealStringId * >( *i );
-        if( !( sid->isStatic_ ) ) {
-            char const * stmp = sid->string_;
-            sid->string_ = inStr;
-            sid->isStatic_ = true;
-            delete [] stmp;
-            atomicDecrement( &totalStringIds_ );
-            atomicIncrement( &totalStaticStringIds_ );
-            atomicSubtract( &totalStringBytes_, sid->length_ );
-        }
+    AutoDispose<NewRealStringId::Reference> sid(createRecord(inStr, numeric_cast<uint32>(len), numeric_cast<uint32>(len + 1), true));
+    AutoDispose<NewRealStringId::Reference> found;
+    {
+        auto table = getNewStringTable();
+        sid->generation_ = table.generation_;
+        AutoDispose<> proto(phantomTryBindPrototype<PhantomUniversal>());
+        table.table_->update(*sid, [&](StringPhantom *& old)->void {
+            if (!old || (sid->generation_ < old->data_->generation_) || (!old->data_->isStatic_)) {
+                old = new StringPhantom(sid);
+            } else {
+                old = new StringPhantom(old->data_, old->count_ + 1);
+            }
+            found = old->data_->ref();
+        });
     }
-    atomicIncrement( &sid->refs_ );
-    return StringId( static_cast< tools::impl::StringIdData * >( sid ) );
+    TOOLS_ASSERT(!!found);
+    return StringId(found.release());
 }
 
 #include <tools/UnitTest.h>
@@ -351,195 +370,298 @@ TOOLS_TEST_CASE("StringId.raw", [](Test &)
 {
     char const * str = "TestRawStringTable string";
     size_t len = strlen( str );
-    size_t hsh = StringHash( str, numeric_cast<uint32>(len) );
+    size_t hsh = stringHash( str, numeric_cast<uint32>(len) );
     // create string record
-    RealStringId * rid = new RealStringId( str, hsh, len, true );
-    TOOLS_ASSERTR( !!rid );
-    TOOLS_ASSERTR( rid->isStatic_ );
-    TOOLS_ASSERTR( rid->length_ == len );
-    TOOLS_ASSERTR( rid->string_ == str );
-    TOOLS_ASSERTR( rid->hash_ == hsh );
-    TOOLS_ASSERTR( rid->refs_ == 0 );
-    // add record to the table
-    StringTable::iterator i = GetStringTable().find( rid );
-    TOOLS_ASSERTR( i == GetStringTable().end() );
-    std::pair< StringTable::iterator, bool > resp = GetStringTable().insert( rid );
-    TOOLS_ASSERTR( resp.second );
-    TOOLS_ASSERTR( resp.first != GetStringTable().end() );
-    rid->refs_ = 1;
-    i = GetStringTable().find( rid );
-    TOOLS_ASSERTR( i != GetStringTable().end() );
-    // make a copy of the string so that we have a different pointer
-    char * str2 = (char *)( alloca( sizeof( char ) * ( len + 1 ) ) );
-    memcpy( str2, str, sizeof( char ) * ( len + 1 ) );
-    size_t len2 = strlen( str2 );
-    TOOLS_ASSERTR( len == len2 );
-    size_t hsh2 = StringHash( str2, numeric_cast<uint32>(len2) );
-    TOOLS_ASSERTR( hsh == hsh2 );
-    RealStringId * rid2 = new RealStringId( str2, hsh2, len2, true );
-    TOOLS_ASSERTR( !!rid2 );
-    TOOLS_ASSERTR( rid2->isStatic_ );
-    TOOLS_ASSERTR( rid2->length_ == len2 );
-    TOOLS_ASSERTR( rid2->string_ == str2 );
-    TOOLS_ASSERTR( rid2->hash_ == hsh2 );
-    TOOLS_ASSERTR( rid2->refs_ == 0 );
-    // lookup the new record
-    i = GetStringTable().find( rid2 );
-    TOOLS_ASSERTR( (*i)->string_ == str );
-    // delete duplicate record
-    delete rid2;
-    // remove record from the table
-    i = GetStringTable().find( rid );
-    TOOLS_ASSERTR( i != GetStringTable().end() );
-    rid->refs_ = 0;
-    GetStringTable().erase( rid );
-    i = GetStringTable().find( rid );
-    TOOLS_ASSERTR( i == GetStringTable().end() );
-    // destroy record
-    delete rid;
+    AutoDispose<NewRealStringId::Reference> rid(new NewRealStringId(str, hsh, len, true, 0));
+    TOOLS_ASSERTR(!!rid);
+    TOOLS_ASSERTR(rid->isStatic_);
+    TOOLS_ASSERTR(rid->length_ == len);
+    TOOLS_ASSERTR(rid->string_ == str);
+    TOOLS_ASSERTR(rid->hash_ == hsh);
+    // Add record to the table
+    {
+        auto table = getNewStringTable();
+        rid->generation_ = table.generation_;
+        AutoDispose<> proto(phantomTryBindPrototype<PhantomUniversal>());
+        table.table_->update(*rid, [&](StringPhantom *& old)->void {
+            if (!old || ((rid->generation_ < old->data_->generation_) && !old->data_->isStatic_)) {
+                old = new StringPhantom(rid);
+            } else {
+                TOOLS_ASSERTR(!"Test string already exists in table");
+            }
+        });
+    }
+    // Can we find the string in the table?
+    {
+        bool found = false;
+        AutoDispose<NewRealStringId::Reference> rid2(new NewRealStringId(str, hsh, len, true, 0));
+        auto table = getNewStringTable();
+        rid2->generation_ = table.generation_;
+        table.table_->find(*rid2, [&](StringPhantom * element)->void {
+            if (!!element) {
+                TOOLS_ASSERTR(*element->data_ == *rid2);
+                TOOLS_ASSERTR(element->data_->generation_ < rid2->generation_);
+                TOOLS_ASSERTR(element->data_->isStatic_);
+                found = true;
+            }
+        });
+        TOOLS_ASSERTR(found);
+    }
+    // Make a copy of the string so that we have a different pointer, then check
+    {
+        char * str2 = static_cast<char *>(alloca(sizeof(char) * (len + 1)));
+        memcpy(str2, str, sizeof(char) * (len + 1));
+        size_t len2 = strlen(str2);
+        TOOLS_ASSERTR(len == len2);
+        size_t hsh2 = stringHash(str2, numeric_cast<uint32>(len2));
+        TOOLS_ASSERTR(hsh == hsh2);
+        AutoDispose<NewRealStringId::Reference> rid2(new NewRealStringId(str2, hsh2, len2, true, 0));
+        TOOLS_ASSERTR(!!rid2);
+        TOOLS_ASSERTR(rid2->isStatic_);
+        TOOLS_ASSERTR(rid2->length_ == len2);
+        TOOLS_ASSERTR(rid2->string_ == str2);
+        TOOLS_ASSERTR(rid2->hash_ == hsh2);
+        // Lookup the new record
+        bool found = false;
+        auto table = getNewStringTable();
+        rid2->generation_ = table.generation_;
+        table.table_->find(*rid2, [&](StringPhantom * element)->void {
+            if (!!element) {
+                TOOLS_ASSERTR(*element->data_ == *rid2);
+                TOOLS_ASSERTR(element->data_->generation_ < rid2->generation_);
+                TOOLS_ASSERTR(element->data_->isStatic_);
+                TOOLS_ASSERTR(element->data_->string_ != rid2->string_);
+                found = true;
+            }
+        });
+        TOOLS_ASSERTR(found);
+    }
+    // Cleanup by removing the record from the table
+    {
+        TOOLS_ASSERTR(!!rid);
+        auto table = getNewStringTable();
+        AutoDispose<> proto(phantomTryBindPrototype<PhantomUniversal>());
+        table.table_->update(*rid, [&](StringPhantom *& old)->void {
+            if (!!old && (old->data_ == rid) && (old->data_->generation_ == rid->generation_)) {
+                if (old->count_ == 1U) {
+                    old = nullptr;
+                } else {
+                    TOOLS_ASSERTR(!"string record has too high reference count");
+                }
+            }
+        });
+    }
 });
 
 TOOLS_TEST_CASE("StringId.static", [](Test &)
 {
     char const * str = "TestStaticStringId string";
     size_t len = strlen( str );
-    size_t hsh = StringHash( str, numeric_cast<uint32>(len) );
-    RealStringId * rid = new RealStringId( str, hsh, numeric_cast<uint32>(len), true );
-    StringTable::iterator i;
+    size_t hsh = stringHash( str, numeric_cast<uint32>(len) );
+    AutoDispose<NewRealStringId::Reference> rid(new NewRealStringId(str, hsh, numeric_cast<uint32>(len), true, 0));
+    // Check that the table does not already contain our test string
     {
-        StringId sid( StaticStringId( str ) );
-        i = GetStringTable().find( rid );
-        TOOLS_ASSERTR( i != GetStringTable().end() );
-        RealStringId * rid2 = static_cast< RealStringId * >( *i );
-        TOOLS_ASSERTR( rid2->hash_ == hsh );
-        TOOLS_ASSERTR( rid2->isStatic_ );
-        TOOLS_ASSERTR( rid2->length_ == len );
-        TOOLS_ASSERTR( rid2->refs_ == 1 );
-        TOOLS_ASSERTR( rid2->string_ == str );
-        TOOLS_ASSERTR( sid.c_str() == str );
-        TOOLS_ASSERTR( sid.length() == len );
-        TOOLS_ASSERTR( sid.hash() == hsh );
-        TOOLS_ASSERTR( !!sid );
-        // make a copy of the string so that we have a different pointer
-        {
-            char * str2 = (char *)( alloca( sizeof( char ) * ( len + 1 ) ) );
-            memcpy( str2, str, sizeof( char ) * ( len + 1 ) );
-            StringId sid2( StaticStringId( str2 ) );
-            TOOLS_ASSERTR( rid2->refs_ == 2 );
-            TOOLS_ASSERTR( sid == sid2 );
-        }
-        // sid2 went out of scope, and so should have released the reference in the table
-        TOOLS_ASSERTR( rid2->refs_ == 1 );
+        auto table = getNewStringTable();
+        table.table_->find(*rid, [](StringPhantom * element)->void {
+            TOOLS_ASSERTR(!element);
+        });
     }
-    // sid1 went out of scope, so the string should not be in the table anymore
-    i = GetStringTable().find( rid );
-    TOOLS_ASSERTR( i == GetStringTable().end() );
-    delete rid;
+    {
+        StringId sid(StaticStringId(str));
+        bool found = false;
+        auto table = getNewStringTable();
+        table.table_->find(*rid, [&](StringPhantom * element)->void {
+            if (!!element) {
+                TOOLS_ASSERTR(*element->data_ == *rid);
+                TOOLS_ASSERTR(element->data_->isStatic_);
+                TOOLS_ASSERTR(element->data_->string_ == rid->string_);
+                TOOLS_ASSERTR(element->data_->hash_ == rid->hash_);
+                TOOLS_ASSERTR(element->data_->length_ == rid->length_);
+                found = true;
+            }
+        });
+        TOOLS_ASSERTR(found);
+        TOOLS_ASSERTR(sid.c_str() == str);
+        TOOLS_ASSERTR(sid.length() == len);
+        TOOLS_ASSERTR(sid.hash() == hsh);
+        TOOLS_ASSERTR(!!sid);
+        // Make a copy so we have a different pointer
+        {
+            char * str2 = static_cast<char *>(alloca(sizeof(char) * (len + 1)));
+            memcpy(str2, str, sizeof(char) * (len + 1));
+            StringId sid2(StaticStringId(str2));
+            TOOLS_ASSERTR(sid == sid2);
+            TOOLS_ASSERTR(sid2.c_str() == str);
+        }
+    }
+    // Make sure the entry is no longer in the table
+    {
+        auto table = getNewStringTable();
+        table.table_->find(*rid, [](StringPhantom * element)->void {
+            TOOLS_ASSERTR(!element);
+        });
+    }
 });
 
 TOOLS_TEST_CASE("StringId.nonStatic", [](Test &)
 {
     char const * str = "TestNonStaticStringId string";
     size_t len = strlen( str );
-    size_t hsh = StringHash( str, numeric_cast<uint32>(len) );
-    RealStringId * rid = new RealStringId( str, hsh, len, true );
-    StringTable::iterator i;
+    size_t hsh = stringHash( str, numeric_cast<uint32>(len) );
+    AutoDispose<NewRealStringId::Reference> rid(new NewRealStringId(str, hsh, len, true, 0));
+    // Check that our test string is not already in the table
     {
-        StringId sid( str );
-        i = GetStringTable().find( rid );
-        TOOLS_ASSERTR( i != GetStringTable().end() );
-        RealStringId * rid2 = static_cast< RealStringId * >( *i );
-        TOOLS_ASSERTR( rid2->hash_ == hsh );
-        TOOLS_ASSERTR( !( rid2->isStatic_ ) );
-        TOOLS_ASSERTR( rid2->length_ == len );
-        TOOLS_ASSERTR( rid2->refs_ == 1 );
-        TOOLS_ASSERTR( rid2->string_ != str );
-        TOOLS_ASSERTR( strcmp( rid2->string_, str ) == 0 );
-        TOOLS_ASSERTR( sid.c_str() != str );
-        TOOLS_ASSERTR( strcmp( sid.c_str(), str ) == 0 );
-        TOOLS_ASSERTR( sid.length() == len );
-        TOOLS_ASSERTR( sid.hash() == hsh );
-        TOOLS_ASSERTR( !!sid );
-        char const * str2 = "TestNonStaticStringId stringblahlblah";
-        StringId sid2( str2, numeric_cast<sint32>(len) );
-        TOOLS_ASSERTR( !!sid2 );
-        TOOLS_ASSERTR( sid == sid2 );
-        TOOLS_ASSERTR( rid2->refs_ == 2 );
-        std::string wstr( str );
-        StringId sid3( wstr );
-        TOOLS_ASSERTR( !!sid3 );
-        TOOLS_ASSERTR( sid == sid3 );
-        TOOLS_ASSERTR( rid2->refs_ == 3 );
-        StringId sid4( sid );
-        TOOLS_ASSERTR( !!sid4 );
-        TOOLS_ASSERTR( sid == sid4 );
-        TOOLS_ASSERTR( rid2->refs_ == 4 );
-        StringId sid5( str2 );
-        TOOLS_ASSERTR( !!sid5 );
-        TOOLS_ASSERTR( sid != sid5 );
-        TOOLS_ASSERTR( rid2->refs_ == 4 );
-        StringId sid6;
-        TOOLS_ASSERTR( !sid6 );
-        TOOLS_ASSERTR( sid != sid6 );
-        TOOLS_ASSERTR( rid2->refs_ == 4 );
-        sid6 = sid;
-        TOOLS_ASSERTR( !!sid6 );
-        TOOLS_ASSERTR( sid == sid6 );
-        TOOLS_ASSERTR( rid2->refs_ == 5 );
-        // non-member functions
-        TOOLS_ASSERTR( str == sid );
-        TOOLS_ASSERTR( wstr == sid );
-        TOOLS_ASSERTR( str2 != sid );
-        std::string str3( str2 );
-        TOOLS_ASSERTR( str3 != sid );
+        auto table = getNewStringTable();
+        table.table_->find(*rid, [](StringPhantom * element)->void {
+            TOOLS_ASSERTR(!element);
+        });
     }
-    // all StringId instances are out of scope, string should no longer be in table
-    i = GetStringTable().find( rid );
-    TOOLS_ASSERTR( i == GetStringTable().end() );
-    delete rid;
+    {
+        StringId sid(str);
+        bool found = false;
+        auto table = getNewStringTable();
+        table.table_->find(*rid, [&](StringPhantom * element)->void {
+            if (!!element) {
+                TOOLS_ASSERTR(*element->data_ == *rid);
+                TOOLS_ASSERTR(element->data_->string_ != str);
+                TOOLS_ASSERTR(strcmp(element->data_->string_, str) == 0);
+                TOOLS_ASSERTR(element->data_->hash_ == hsh);
+                TOOLS_ASSERTR(element->data_->length_ == len);
+                TOOLS_ASSERTR(!element->data_->isStatic_);
+                found = true;
+            }
+        });
+        TOOLS_ASSERTR(found);
+        TOOLS_ASSERTR(sid.c_str() != str);
+        TOOLS_ASSERTR(strcmp(sid.c_str(), str) == 0);
+        TOOLS_ASSERTR(sid.length() == len);
+        TOOLS_ASSERTR(sid.hash() == hsh);
+        TOOLS_ASSERTR(!!sid);
+        char const * str2 = "TestNonStaticStringId stringblahlblah";
+        StringId sid2(str2, numeric_cast<sint32>(len));
+        TOOLS_ASSERTR(!!sid2);
+        TOOLS_ASSERTR(sid == sid2);
+        std::string str3(str);
+        StringId sid3(str3);
+        TOOLS_ASSERTR(!!sid3);
+        TOOLS_ASSERTR(sid == sid3);
+        StringId sid4(sid);
+        TOOLS_ASSERTR(!!sid4);
+        TOOLS_ASSERTR(sid == sid4);
+        StringId sid5(str2);
+        TOOLS_ASSERTR(!!sid5);
+        TOOLS_ASSERTR(sid != sid5);
+        StringId sid6;
+        TOOLS_ASSERTR(!sid6);
+        TOOLS_ASSERTR(sid != sid6);
+        sid6 = sid;
+        TOOLS_ASSERTR(!!sid6);
+        TOOLS_ASSERTR(sid == sid6);
+        // Non-member functions
+        TOOLS_ASSERTR(str == sid);
+        TOOLS_ASSERTR(str3 == sid);
+        TOOLS_ASSERTR(str2 != sid);
+        std::string str4(str2);
+        TOOLS_ASSERTR(str4 != sid);
+    }
+    // All StringIds have gone out of scope, the string table should no longer have our test string.
+    {
+        auto table = getNewStringTable();
+        table.table_->find(*rid, [](StringPhantom * element)->void {
+            TOOLS_ASSERTR(!element);
+        });
+    }
 });
 
 TOOLS_TEST_CASE("StringId.static.promotion", [](Test &)
 {
     char const * str = "TestStringIdStaticPromotion string";
     size_t len = strlen( str );
-    size_t hsh = StringHash( str, numeric_cast<uint32>(len) );
-    RealStringId * rid = new RealStringId( str, hsh, len, true );
-    StringTable::iterator i;
+    size_t hsh = stringHash( str, numeric_cast<uint32>(len) );
+    AutoDispose<NewRealStringId::Reference> rid(new NewRealStringId(str, hsh, len, true, 0));
+    // Check that our test string is not already in the table
     {
-        // non-static to static promotion
+        auto table = getNewStringTable();
+        table.table_->find(*rid, [](StringPhantom * element)->void {
+            TOOLS_ASSERTR(!element);
+        });
+    }
+    {
+        // Non-static to static promotion
         {
-            StringId sid( str );
-            i = GetStringTable().find( rid );
-            TOOLS_ASSERTR( i != GetStringTable().end() );
-            RealStringId * rid2 = static_cast< RealStringId * >( *i );
-            TOOLS_ASSERTR( !( rid2->isStatic_ ) );
-            StringId sid2( StaticStringId( str ) );
-            TOOLS_ASSERTR( sid2 == sid );
-            TOOLS_ASSERTR( sid2.c_str() == str );
-            TOOLS_ASSERTR( rid2->isStatic_ );
-            TOOLS_ASSERTR( rid2->refs_ == 2 );
-        }
-        i = GetStringTable().find( rid );
-        TOOLS_ASSERTR( i == GetStringTable().end() );
-        // static remains static
-        {
-            StringId sid( StaticStringId( str ) );
-            i = GetStringTable().find( rid );
-            TOOLS_ASSERTR( i != GetStringTable().end() );
-            RealStringId * rid2 = static_cast< RealStringId * >( *i );
-            TOOLS_ASSERTR( rid2->isStatic_ );
-            StringId sid2( str );
-            TOOLS_ASSERTR( sid2 == sid );
-            TOOLS_ASSERTR( sid2.c_str() == str );
-            TOOLS_ASSERTR( rid2->isStatic_ );
-            TOOLS_ASSERTR( rid2->refs_ == 2 );
+            StringId sid(str);
+            {
+                bool found = false;
+                auto table = getNewStringTable();
+                table.table_->find(*rid, [&](StringPhantom * element)->void {
+                    if (!!element) {
+                        TOOLS_ASSERTR(*element->data_ == *rid);
+                        TOOLS_ASSERTR(!element->data_->isStatic_);
+                        found = true;
+                    }
+                });
+                TOOLS_ASSERTR(found);
+            }
+            StringId sid2(StaticStringId(str));
+            {
+                bool found = false;
+                auto table = getNewStringTable();
+                table.table_->find(*rid, [&](StringPhantom * element)->void {
+                    if (!!element) {
+                        TOOLS_ASSERTR(*element->data_ == *rid);
+                        TOOLS_ASSERTR(element->data_->isStatic_);
+                        found = true;
+                    }
+                });
+                TOOLS_ASSERTR(found);
+            }
+            TOOLS_ASSERTR(sid2 == sid);
+            TOOLS_ASSERTR(sid2.c_str() == str);
         }
     }
-    // all StringId instances are out of scope, string should no longer be in table
-    i = GetStringTable().find( rid );
-    TOOLS_ASSERTR( i == GetStringTable().end() );
-    delete rid;
+    {
+        auto table = getNewStringTable();
+        table.table_->find(*rid, [](StringPhantom * element)->void {
+            TOOLS_ASSERTR(!element);
+        });
+    }
+    // Static remains static
+    {
+        StringId sid(StaticStringId(str));
+        {
+            bool found = false;
+            auto table = getNewStringTable();
+            table.table_->find(*rid, [&](StringPhantom * element)->void {
+                if (!!element) {
+                    TOOLS_ASSERTR(*element->data_ == *rid);
+                    TOOLS_ASSERTR(element->data_->isStatic_);
+                    found = true;
+                }
+            });
+            TOOLS_ASSERTR(found);
+        }
+        StringId sid2(str);
+        {
+            bool found = false;
+            auto table = getNewStringTable();
+            table.table_->find(*rid, [&](StringPhantom * element)->void {
+                if (!!element) {
+                    TOOLS_ASSERTR(*element->data_ == *rid);
+                    TOOLS_ASSERTR(element->data_->isStatic_);
+                    found = true;
+                }
+            });
+            TOOLS_ASSERTR(found);
+        }
+        TOOLS_ASSERTR(sid2 == sid);
+        TOOLS_ASSERTR(sid2.c_str() == str);
+    }
+    {
+        auto table = getNewStringTable();
+        table.table_->find(*rid, [](StringPhantom * element)->void {
+            TOOLS_ASSERTR(!element);
+        });
+    }
 });
 
 TOOLS_TEST_CASE("StringId.empty", [](Test &)
