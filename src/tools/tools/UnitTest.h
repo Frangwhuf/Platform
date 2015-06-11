@@ -202,6 +202,9 @@ namespace tools {
             bool notified_;
             AutoDispose<Error::Reference> err_;
         };
+    protected:
+        virtual void finalize_inner(AutoDispose<> &&) = 0;
+    public:
 
 		virtual void sync(void) = 0;
 		virtual void resume(void) = 0;
@@ -211,16 +214,22 @@ namespace tools {
 		virtual void adjustPendingTimer(sint64) = 0;
 		virtual void skewWalltime(sint64) = 0;
 		virtual void endTimers(void) = 0;
-		virtual void finalize(AutoDispose<> &&) = 0;
 		virtual TestEnv & environment(void) = 0;
 		virtual Environment & trueEnvironment(void) = 0;
 		virtual AutoDispose<> & cloak(void) = 0;
 
+        template<typename AnyT>
+        TOOLS_FORCE_INLINE NoDispose<AnyT>
+        finalize(AutoDispose<AnyT> && disp)
+        {
+            NoDispose<AnyT> ret(disp);
+            this->finalize_inner(std::move(disp));
+            return ret;
+        }
+
         virtual void run(NoDispose<Request> const &, RequestStatus &) = 0;
         TOOLS_FORCE_INLINE void run(AutoDispose<Request> && req, RequestStatus & status) {
-            NoDispose<Request> local(req);
-            finalize(std::move(req));
-            run(local, status);
+            run(this->finalize(std::move(req)), status);
         }
         virtual void runAndAssertSuccess(AutoDispose<Request> &&) = 0;
         virtual void runAndAssertSuccess(NoDispose<Request> const &) = 0;

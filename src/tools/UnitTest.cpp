@@ -59,6 +59,7 @@ namespace {
         ~TestImpl(void);
 
 		// Test
+		void finalize_inner(AutoDispose<> &&) override;
 		void sync(void) override;
 		void resume(void) override;
 		void progressTime(void) override;
@@ -67,7 +68,6 @@ namespace {
 		void adjustPendingTimer(sint64) override;
 		void skewWalltime(sint64) override;
 		void endTimers(void) override;
-		void finalize(AutoDispose<> &&) override;
 		TestEnv & environment(void) override;
 		Environment & trueEnvironment(void) override;
 		AutoDispose<> & cloak(void) override;
@@ -354,6 +354,12 @@ TestImpl::~TestImpl(void)
 }
 
 void
+TestImpl::finalize_inner(AutoDispose<> && toDisp)
+{
+    finalizes_.push_back(std::move(toDisp));
+}
+
+void
 TestImpl::sync(void)
 {
     TOOLS_ASSERT(!isMainThread());
@@ -451,12 +457,6 @@ TestImpl::endTimers(void)
         request->cancel_ = true;
         start(request->thunk_);
     }
-}
-
-void
-TestImpl::finalize(AutoDispose<> && toDisp)
-{
-    finalizes_.push_back(std::move(toDisp));
 }
 
 TestEnv &
