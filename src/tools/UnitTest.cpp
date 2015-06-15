@@ -26,8 +26,6 @@
 
 using namespace tools;
 
-typedef std::vector< unittest::UnitTest * > UnitTests;
-
 // CONFIGURE_STATIC( UnitTestConfig );
 // CONFIGURE_FUNCTION( UnitTestConfig ) {
 // }
@@ -41,14 +39,6 @@ namespace tools {
 };  // tools namespace
 
 namespace {
-	static UnitTests & GetUnitTests( void )
-	{
-		static UnitTests collection_;
-		return collection_;
-	}
-
-	// static notification::Category unitCat( StaticStringId( L"UnitTest" ), StringIdNull() );
-
 	struct MockScheduler;
     struct TestEnvItf : TestEnv, Disposable {};
 	struct TestImpl
@@ -347,86 +337,6 @@ namespace {
         RegisterMock<UnmockStopper, UnmockStopperImpl>;
 };  // anonymous namespace
 
-void
-impl::RegisterUnitTest( unittest::UnitTest * test )
-{
-  GetUnitTests().push_back( test );
-}
-
-void
-impl::UnregisterUnitTest( unittest::UnitTest * test )
-{
-  UnitTests & collection( GetUnitTests() );
-  for( auto && element : collection ) {
-    if( element == test ) {
-      element = collection.back();
-      collection.pop_back();
-      return;
-    }
-  }
-}
-
-void
-impl::UnitTestMain( int, char ** )
-{
-  // if( UnitTestConfig.defined( L"help" ) ) {
-  //   boost::wformat fmt( L"%s [-help] [-verbose 0/1] [-repeat n] [-runTest name]*" );
-  //   // TODO: replace the application name below
-  //   NOTIFY_INFO( unitCat ) << ( fmt % L"UnitTestRunner" ).str() << std::endl;
-  // }
-  // tools::PreloadLibraries();
-  // bool verbose( UnitTestConfig.get< bool >( L"verbose" ) );
-  // uint32 count( UnitTestConfig.get< uint32 >( L"repeat", 1 ) );
-  //bool verbose = false;
-  uint32 count = 1;
-  typedef std::vector< boost::regex > Patterns;
-  Patterns patterns;
-  {
-    // AutoDispose< StringIdIterator > runIter( UnitTestConfig.getAll< StringId >( L"runTest" ) );
-    // StringId * sVal;
-    // while( ( sVal = runIter->next() ) != nullptr ) {
-    //   patterns.push_back( boost::wregex( sVal->c_str() ) );
-    // }
-  }
-  // TODO: put this back when I make thread context
-  // AutoDispose< Context > context( NewThreadContext( alloca( ContextGetThreadAllocationSize() ) ) );
-  boost::format nameFmt( "%s:%s" );
-  UnitTests & collection( GetUnitTests() );
-  for( auto && test : collection ) {
-    // Check against patterns
-    bool matched( false );
-    if( !patterns.empty() ) {
-      for( auto && pattern : patterns ) {
-        nameFmt % test->file() % test->name();
-        StringId nameId( nameFmt.str() );
-#ifdef WINDOWS_PLATFORM
-        // TODO: flip backslash to slash in file part.  Better yet, do this
-        // when the flie part is assigned.
-#endif /* WINDOWS_PLATFORM */
-        if( regex_match( nameId.c_str(), pattern ) ) {
-          matched = true;
-          break;  // only need one
-        }
-      }
-    } else {
-      matched = true;  // no patterns = always match.
-    }
-    if( matched ) {
-      for( uint32 c=0; c<count; ++c ) {
-        //   if( verbose ) {
-        // NOTIFY_INFO( unitCat ) << L"Running test " << (*i)->file() << L":" << (*i)->name() << L"..." << std::endl;
-        //   }
-        test->run();
-        // context->clean();
-      }
-    }
-  }
-  // if( verbose ) {
-  //   NOTIFY_INFO( unitCat ) << L"Finished running unit tests." << std::endl;
-  // }
-  patterns.clear();
-}
-
 ///////////////////////
 // Non-member Functions
 ///////////////////////
@@ -486,7 +396,7 @@ TestImpl::TestImpl(Environment & env, StringId const & name)
 TestImpl::~TestImpl(void)
 {
     // TOOLS_ASSERT(memoryValidate());
-    //unmock_stopper_do_stops(this);
+    testEnvironment_->get<UnmockStopper>()->doStops();
     if (!!thread_) {
         // Terminate the test thread
         terminated_ = true;

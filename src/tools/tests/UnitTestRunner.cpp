@@ -5,9 +5,6 @@ using namespace tools;
 int
 main( int argc, char** argv )
 {
-#if 0
-    tools::impl::UnitTestMain( argc, argv );
-#else // 0
     AutoDispose<> envLifetime;
     Environment * env = NewSimpleEnvironment(envLifetime, "test");
     TOOLS_ASSERT(!!env);
@@ -43,5 +40,4 @@ main( int argc, char** argv )
         auto err(runRequestSynchronously(stopReq));
         TOOLS_ASSERT(!err);
     }
-#endif // 0
 }

@@ -5994,7 +5994,7 @@ TOOLS_TEST_CASE("affinity.temporal.customSlab", "Temporal is not completely happ
     pool.unmap(ptr6);
 });
 
-TOOLS_TEST_CASE("affinity.temporal.customSlab", "Temporal is not completely happy", [](Test &)
+TOOLS_TEST_CASE("affinity.temporal.customSlab.alignment", "Temporal is not completely happy", [](Test &)
 {
     enum : unsigned {
         alignment = 256,  // temporal defaul is 64

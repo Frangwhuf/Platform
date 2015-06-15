@@ -301,62 +301,31 @@ namespace tools {
 #if TOOLS_UNIT_TEST
 
 namespace {
-  struct SimpleEnvironmentUnitTest {
-    SimpleEnvironmentUnitTest( void )
+    struct EnvTestService {
+        virtual bool haveStarted(void) = 0;
+        virtual bool haveStopped(void) = 0;
+    };
+
+    struct EnvTestImpl
+        : EnvTestService
+        , tools::detail::StandardNoBindService< EnvTestImpl, boost::mpl::list< EnvTestService >::type >
     {
-        // do this in the body, so that env_disp_ gets properly constructed first
-        env_ = tools::NewSimpleEnvironment( env_disp_ );
-    }
+        EnvTestImpl(Environment &);
 
-    void doEmptyTest( void );
-    void doFactoryTest( void );
+        // Service
+        AutoDispose< Request > serviceStart(void);
+        AutoDispose< Request > serviceStop(void);
 
-    tools::Environment * env_;
-    tools::AutoDispose<> env_disp_;
-  };
-};  // anonymous namespace
+        // EnvTestService
+        bool haveStarted(void);
+        bool haveStopped(void);
 
-struct EnvTestService {
-    virtual bool haveStarted( void ) = 0;
-    virtual bool haveStopped( void ) = 0;
-};
+        bool started_;
+        bool stopped_;
+    };
 
-struct EnvTestImpl
-    : EnvTestService
-    , tools::detail::StandardNoBindService< EnvTestImpl, boost::mpl::list< EnvTestService >::type >
-{
-    EnvTestImpl( Environment & );
-
-    // Service
-    AutoDispose< Request > serviceStart( void );
-    AutoDispose< Request > serviceStop( void );
-
-    // EnvTestService
-    bool haveStarted( void );
-    bool haveStopped( void );
-
-    bool started_;
-    bool stopped_;
-};
-
-////////////////////////////
-// SimpleEnvironmentUnitTest
-////////////////////////////
-
-void
-SimpleEnvironmentUnitTest::doEmptyTest( void )
-{
-    TOOLS_ASSERTR( tools::IsNullOrEmptyStringId( env_->name() ));
-}
-
-void
-SimpleEnvironmentUnitTest::doFactoryTest( void )
-{
-    EnvTestService * svc = env_->get< EnvTestService >();
-    TOOLS_ASSERTR( !!svc );
-    TOOLS_ASSERTR( svc->haveStarted() );
-    TOOLS_ASSERTR( !svc->haveStopped() );
-}
+    static RegisterEnvironment< EnvTestService, EnvTestImpl > regEnvTest;
+}; // anonymous namespace
 
 //////////////
 // EnvTestImpl
@@ -395,8 +364,21 @@ EnvTestImpl::haveStopped( void )
     return stopped_;
 }
 
-TOOLS_UNIT_TEST_METHOD( SimpleEnvironmentUnitTest, doEmptyTest );
-TOOLS_UNIT_TEST_METHOD( SimpleEnvironmentUnitTest, doFactoryTest );
+////////
+// Tests
+////////
 
-static RegisterEnvironment< EnvTestService, EnvTestImpl > regEnvTest;
+TOOLS_TEST_CASE("Environment.empty", [](Test & test)
+{
+    TOOLS_ASSERTR(!IsNullOrEmptyStringId(test.environment().name()));
+});
+
+TOOLS_TEST_CASE("Environment.factory", [](Test & test)
+{
+    test.environment().unmock<EnvTestService>();
+    auto svc = test.environment().get<EnvTestService>();
+    TOOLS_ASSERTR(!!svc);
+    TOOLS_ASSERTR(svc->haveStarted());
+    TOOLS_ASSERTR(!svc->haveStopped());
+});
 #endif /* TOOLS_UNIT_TEST */

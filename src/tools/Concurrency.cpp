@@ -3353,6 +3353,7 @@ ThreadScheduler::fork(
 #include <tools/UnitTest.h>
 #if TOOLS_UNIT_TEST
 #include <tools/Environment.h>
+#include <tools/Interface.h>
 #include <tools/Timing.h>
 
 //////////
@@ -3363,97 +3364,98 @@ namespace {
     struct ThreadingTestImpl
         : Notifiable< ThreadingTestImpl >
     {
-        ThreadingTestImpl( void );
-
-        // tests
-        void doTrivialTest( void );
-        void doTrivialThreadCreate( void );
-        void doSingleThreadTest( void );
+        ThreadingTestImpl(NoDispose< ConditionVar >, NoDispose< Monitor >, NoDispose< Monitor >);
 
         // support methods
         void trivialSupport( void );
         void singleThreadSupport( void );
 
-        Environment * env_;
-        AutoDispose<> envLifetime_;
-        AutoDispose< ConditionVar > cvar_;
-        AutoDispose< Monitor > cvarLock_;
-        AutoDispose< Monitor > lock_;
-        Timing * timing_;
+        NoDispose< ConditionVar > cvar_;
+        NoDispose< Monitor > cvarLock_;
+        NoDispose< Monitor > lock_;
         unsigned volatile flag1_;
         unsigned volatile flag2_;
     };
 };  // anonymous namespace
 
-TOOLS_UNIT_TEST_METHOD( ThreadingTestImpl, doTrivialTest );
-//TOOLS_UNIT_TEST_METHOD( ThreadingTestImpl, doTrivialThreadCreate );
-//TOOLS_UNIT_TEST_METHOD( ThreadingTestImpl, doSingleThreadTest );
+////////
+// Tests
+////////
+
+TOOLS_TEST_CASE("threading.trivial", [](Test & test)
+{
+    AutoDispose<ConditionVar> cvar(conditionVarNew());
+    AutoDispose<Monitor> cvarLock(cvar->monitorNew());
+    AutoDispose<Monitor> lock(monitorNew());
+    auto threading = test.environment().unmockNow<Threading>();
+    TOOLS_ASSERTR(!!threading);
+});
+
+TOOLS_TEST_CASE("threading.trivial.create", "environment isn't disposing things correctly", [](Test & test)
+{
+    AutoDispose<ConditionVar> cvar(conditionVarNew());
+    AutoDispose<Monitor> cvarLock(cvar->monitorNew());
+    AutoDispose<Monitor> lock(monitorNew());
+    auto timing = test.environment().unmockNow<Timing>();
+    auto threading = test.environment().unmockNow<Threading>();
+    TOOLS_ASSERTR(!!threading);
+    ThreadingTestImpl state(cvar, cvarLock, lock);
+
+    AutoDispose< Thread > thr(threading->fork("threadTesting", state.toThunk< &ThreadingTestImpl::trivialSupport >()));
+    TOOLS_ASSERTR(!!thr);
+    thr->waitSync();
+    thr = threading->fork("threadTesting2", state.toThunk< &ThreadingTestImpl::trivialSupport >());
+    TOOLS_ASSERTR(!!thr);
+    AutoDispose< Request > done(thr->wait());
+    TOOLS_ASSERTR(!!done);
+    AutoDispose< Referenced< Error >::Reference > err(runRequestSynchronously(done));
+    TOOLS_ASSERTR(!err);
+    AutoDispose< Request > delay(timing->timer(250 * TOOLS_NANOSECONDS_PER_MILLISECOND));
+    err = runRequestSynchronously(delay);
+    TOOLS_ASSERTR(!err);
+});
+
+TOOLS_TEST_CASE("threading.trivial.single", "environment isn't disposing things correctly", [](Test & test)
+{
+    AutoDispose<ConditionVar> cvar(conditionVarNew());
+    AutoDispose<Monitor> cvarLock(cvar->monitorNew());
+    AutoDispose<Monitor> lock(monitorNew());
+    auto timing = test.environment().unmockNow<Timing>();
+    auto threading = test.environment().unmockNow<Threading>();
+    TOOLS_ASSERTR(!!threading);
+    ThreadingTestImpl state(cvar, cvarLock, lock);
+
+    AutoDispose< Thread > thr(threading->fork("threadTesting", state.toThunk< &ThreadingTestImpl::singleThreadSupport >()));
+    TOOLS_ASSERTR(!!thr);
+    AutoDispose< Request > delay(timing->timer(250 * TOOLS_NANOSECONDS_PER_MILLISECOND));
+    AutoDispose< Referenced< Error >::Reference > err(runRequestSynchronously(delay));
+    TOOLS_ASSERTR(!err);
+    while (!state.flag1_);  // get the thread started
+    AutoDispose<> l_(lock->enter());
+    TOOLS_ASSERTR(!state.flag2_);
+    l_ = nullptr;
+    delay = timing->timer(250 * TOOLS_NANOSECONDS_PER_MILLISECOND);
+    err = runRequestSynchronously(delay);
+    TOOLS_ASSERTR(!err);
+    cvar->signal();
+    thr->waitSync();
+    TOOLS_ASSERTR(!!state.flag2_);
+});
 
 ////////////////////
 // ThreadingTestImpl
 ////////////////////
 
-ThreadingTestImpl::ThreadingTestImpl( void )
-    : cvar_( conditionVarNew() )
-    , cvarLock_( cvar_->monitorNew() )
-    , lock_( monitorNew() )
+ThreadingTestImpl::ThreadingTestImpl(
+    NoDispose<ConditionVar> cv,
+    NoDispose<Monitor> cvl,
+    NoDispose<Monitor> l)
+    : cvar_( cv )
+    , cvarLock_( cvl )
+    , lock_( l )
     , flag1_( 0U )
     , flag2_( 0U )
 {
-    env_ = NewSimpleEnvironment( envLifetime_ );
-    TOOLS_ASSERTR( !!cvar_ );
-    TOOLS_ASSERTR( !!cvarLock_ );
-    TOOLS_ASSERTR( !!lock_ );
-    timing_ = env_->get< Timing >();
-}
-
-void
-ThreadingTestImpl::doTrivialTest( void )
-{
-    Threading * threadSvc = env_->get< Threading >();
-    TOOLS_ASSERTR( !!threadSvc );
-}
-
-void
-ThreadingTestImpl::doTrivialThreadCreate( void )
-{
-    Threading * threadSvc = env_->get< Threading >();
-    TOOLS_ASSERTR( !!threadSvc );
-    AutoDispose< Thread > thr( threadSvc->fork( "threadTesting", toThunk< &ThreadingTestImpl::trivialSupport >() ));
-    TOOLS_ASSERTR( !!thr );
-    thr->waitSync();
-    thr = threadSvc->fork( "threadTesting2", toThunk< &ThreadingTestImpl::trivialSupport >() );
-    TOOLS_ASSERTR( !!thr );
-    AutoDispose< Request > done( thr->wait() );
-    TOOLS_ASSERTR( !!done );
-    AutoDispose< Referenced< Error >::Reference > err( runRequestSynchronously( done ));
-    TOOLS_ASSERTR( !err );
-    AutoDispose< Request > delay( timing_->timer( 250 * TOOLS_NANOSECONDS_PER_MILLISECOND ));
-    err = runRequestSynchronously( delay );
-    TOOLS_ASSERTR( !err );
-}
-
-void
-ThreadingTestImpl::doSingleThreadTest( void )
-{
-    Threading * threadSvc = env_->get< Threading >();
-    TOOLS_ASSERTR( !!threadSvc );
-    flag1_ = flag2_ = 0U;
-    AutoDispose< Thread > thr( threadSvc->fork( "threadTesting", toThunk< &ThreadingTestImpl::singleThreadSupport >() ) );
-    TOOLS_ASSERTR( !!thr );
-    AutoDispose< Request > delay( timing_->timer( 250 * TOOLS_NANOSECONDS_PER_MILLISECOND ));
-    AutoDispose< Referenced< Error >::Reference > err( runRequestSynchronously( delay ));
-    TOOLS_ASSERTR( !err );
-    while( !flag1_ );  // get the thread started
-    AutoDispose<> l_( lock_->enter() );
-    TOOLS_ASSERTR( !flag2_ );
-    l_.reset();
-    delay = timing_->timer( 250 * TOOLS_NANOSECONDS_PER_MILLISECOND );
-    err = runRequestSynchronously( delay );
-    TOOLS_ASSERTR( !err );
-    cvar_->signal();
-    thr->waitSync();
-    TOOLS_ASSERTR( !!flag2_ );
 }
 
 void

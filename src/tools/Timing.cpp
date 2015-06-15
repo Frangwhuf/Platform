@@ -231,93 +231,65 @@ TimerQueueImpl::post(
 
 #include <tools/UnitTest.h>
 #if TOOLS_UNIT_TEST
+
 //////////
 // Testing
 //////////
 
-namespace {
-    struct TimingTestImpl
+TOOLS_TEST_CASE("Timing.trivial", [](Test & test)
+{
+    test.environment().unmock<Timing>();
+    auto timing = test.environment().get<Timing>();
+    TOOLS_ASSERTR(!!timing);
+});
+
+TOOLS_TEST_CASE("Timing.wait", [](Test & test)
+{
+    test.environment().unmock<Timing>();
+    auto timing = test.environment().get<Timing>();
+    TOOLS_ASSERTR(!!timing);
     {
-        TimingTestImpl( void );
-
-        // tests
-        void doTrivialTest( void );
-        void doWaitTest( void );
-        void doTrivialMarkTest( void );
-        void doMarkWaitTest( void );
-
-        Environment * env_;
-        AutoDispose<> envLifetime_;
-    };
-};  // anonymous namespace
-
-TOOLS_UNIT_TEST_METHOD( TimingTestImpl, doTrivialTest );
-TOOLS_UNIT_TEST_METHOD( TimingTestImpl, doWaitTest );
-TOOLS_UNIT_TEST_METHOD( TimingTestImpl, doTrivialMarkTest );
-TOOLS_UNIT_TEST_METHOD( TimingTestImpl, doMarkWaitTest );
-
-/////////////////
-// TimingTestImpl
-/////////////////
-
-TimingTestImpl::TimingTestImpl( void )
-{
-    env_ = NewSimpleEnvironment( envLifetime_ );
-}
-
-void
-TimingTestImpl::doTrivialTest( void )
-{
-    Timing * timeSvc = env_->get< Timing >();
-    TOOLS_ASSERTR( !!timeSvc );
-}
-
-void
-TimingTestImpl::doWaitTest( void )
-{
-    Timing * timeSvc = env_->get< Timing >();
-    TOOLS_ASSERTR( !!timeSvc );
-    {
-        AutoDispose< Request > req( timeSvc->timer( TOOLS_NANOSECONDS_PER_MILLISECOND ));
-        AutoDispose< Error::Reference > err( runRequestSynchronously( req ));
-        TOOLS_ASSERTR( !err );
+        AutoDispose<Request> req(timing->timer(TOOLS_NANOSECONDS_PER_MILLISECOND));
+        AutoDispose<Error::Reference> err(runRequestSynchronously(req));
+        TOOLS_ASSERTR(!err);
     }
-}
+});
 
-void
-TimingTestImpl::doTrivialMarkTest( void )
+TOOLS_TEST_CASE("Timing.mark.trivial", [](Test & test)
 {
-    Timing * timeSvc = env_->get< Timing >();
-    TOOLS_ASSERTR( !!timeSvc );
-    uint64 mark = timeSvc->mark();
-    TOOLS_ASSERTR( mark != 0 );
+    test.environment().unmock<Timing>();
+    auto timing = test.environment().get<Timing>();
+    TOOLS_ASSERTR(!!timing);
+    auto mark = timing->mark();
+    TOOLS_ASSERTR(mark != 0);
     unsigned count = 0;
     bool changed = false;
     while (!changed && (count < 10000)) {
-        if( timeSvc->mark() != mark ) {
+        if (timing->mark() != mark) {
             changed = true;
         }
         ++count;
     }
-    TOOLS_ASSERTR( changed );
-    uint64 delta = timeSvc->mark( mark );
-    TOOLS_ASSERTR( delta != 0 );
-}
+    TOOLS_ASSERTR(changed);
+    auto delta = timing->mark(mark);
+    TOOLS_ASSERTR(delta != 0);
+    TOOLS_ASSERTR(count > 0);
+});
 
-void
-TimingTestImpl::doMarkWaitTest( void )
+TOOLS_TEST_CASE("Timing.mark.wait", "Timing leaves things allocated", [](Test & test)
 {
-    Timing * timeSvc = env_->get< Timing >();
-    TOOLS_ASSERTR( !!timeSvc );
+    test.environment().unmock<Timing>();
+    auto timing = test.environment().get<Timing>();
+    TOOLS_ASSERTR(!!timing);
     {
-        AutoDispose< Request > req( timeSvc->timer( TOOLS_NANOSECONDS_PER_MILLISECOND ));
-        uint64 mark = timeSvc->mark();
-        TOOLS_ASSERTR( mark != 0 );
-        AutoDispose< Error::Reference > err( runRequestSynchronously( req ));
-        uint64 delta = timeSvc->mark( mark );
-        TOOLS_ASSERTR( !err );
-        TOOLS_ASSERTR( delta >= TOOLS_NANOSECONDS_PER_MILLISECOND );
+        AutoDispose<Request> req(timing->timer(TOOLS_NANOSECONDS_PER_MILLISECOND));
+        auto mark = timing->mark();
+        TOOLS_ASSERTR(mark != 0);
+        AutoDispose<Error::Reference> err(runRequestSynchronously(req));
+        auto delta = timing->mark(mark);
+        TOOLS_ASSERTR(!err);
+        TOOLS_ASSERTR(delta >= TOOLS_NANOSECONDS_PER_MILLISECOND);
     }
-}
+});
 
 #endif // TOOLS_UNIT_TEST
