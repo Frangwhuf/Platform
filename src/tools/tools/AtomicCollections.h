@@ -241,14 +241,14 @@ namespace tools
                 // The list is empty, do nothing
                 return false;
             }
-            tools::impl::prefetch(roots_[root]);
+            tools::detail::prefetch(roots_[root]);
             // Reserve the read reference
             bool parity = states_.refReader();
             // Do the internal iteration
             AnyT * next;
             for (AnyT * i = roots_[root]; !!i; i = next) {
                 next = *atomicLinkOf<LinkRoleNext>(*i);
-                tools::impl::prefetch(next);
+                tools::detail::prefetch(next);
                 if (!func(*i)) {
                     // early exit
                     break;
@@ -258,7 +258,7 @@ namespace tools
         }
         template<typename FuncT>
         TOOLS_FORCE_INLINE bool forEach(FuncT && func) {
-            TOOLS_ASSERT(rootUsed == 1U);
+            TOOLS_ASSERT(rootsUsed == 1U);
             return forEach(0U, func);
         }
         // Append a new entry to the list

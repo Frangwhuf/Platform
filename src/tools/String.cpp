@@ -19,8 +19,6 @@
 using namespace tools;
 using boost::numeric_cast;
 
-#define SHINEY_NEW_STRINGID
-
 namespace {
     static uint64 volatile totalStringIds_ = 0ULL;
     static uint64 volatile totalStaticStringIds_ = 0ULL;

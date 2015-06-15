@@ -560,6 +560,60 @@ namespace {
     {
         return v.id_;
     }
+
+    template<typename TypeT>
+    struct ListEntryBase
+        : AllocStatic<> // TODO: make this Temporal when that works correctly
+        , AtomicListBase<TypeT>
+    {
+        ListEntryBase(int i) : end_(false), deleted_(false), id_(i) {}
+        
+        void extractFinalDispose(void)
+        {
+            TOOLS_ASSERTR(!deleted_);
+            deleted_ = true;
+        }
+
+        bool end_;
+        bool deleted_;
+        int id_;
+    };
+
+    template<typename TypeT>
+    void setEnd(ListEntryBase<TypeT> & entry)
+    {
+        TOOLS_ASSERTR(!entry.end_);
+        entry.end_ = true;
+    }
+
+    struct ListEntry
+        : ListEntryBase<ListEntry>
+    {
+        ListEntry(int i) : ListEntryBase<ListEntry>(i) {}
+    };
+
+    TOOLS_FORCE_INLINE bool isEnd(ListEntry const & entry)
+    {
+        return entry.end_;
+    }
+
+    struct RescanEntry
+        : ListEntryBase<RescanEntry>
+    {
+        RescanEntry(int i) : ListEntryBase<RescanEntry>(i) {}
+
+        static std::function<void(RescanEntry const &)> isEndHook_;
+    };
+
+    std::function<void(RescanEntry const &)> RescanEntry::isEndHook_;
+
+    TOOLS_FORCE_INLINE bool isEnd(RescanEntry const & entry)
+    {
+        // The 'isEndHook' alter this, so cache what we need on the stack.
+        bool ret = entry.end_;
+        RescanEntry::isEndHook_(entry);
+        return ret;
+    }
 };  // anonymous namespace
 
 TOOLS_TEST_CASE("Weakling", [](Test & test)
@@ -696,6 +750,76 @@ TOOLS_TEST_CASE("PhantomHashMap.update.remove", [](Test &)
         TOOLS_ASSERTR( maskAll == masks );
     }
     phMap.clear();
+});
+
+TOOLS_TEST_CASE("AtomicList.deleteCheck", [](Test &)
+{
+    // Make sure that list entries don't get deleted earlier than they should.
+    AtomicList<ListEntry> local;
+    ListEntry a(1), b(2);
+    // Set the list to [a, b]
+    local.push(&b);
+    local.push(&a);
+    // Mark 'a' for delete. It will still be visible until extract().
+    setEnd(a);
+    // Do not, under any circumstances, delete the current element in this loop
+    int i = 1;
+    local.forEach([&](ListEntry & entry)->bool {
+        TOOLS_ASSERTR(!entry.deleted_);
+        TOOLS_ASSERTR(entry.id_ == i);
+        // Extract 'a' to the 'young' list when i = 1. After which it moves to the 'old' list, but deletion is
+        // deffered because the loop is holding a 'linger ref'. Extract 'b' to the 'young' list when i = 2. Again
+        // deletion is deffered.
+        local.extract(false);
+        TOOLS_ASSERTR(!entry.deleted_);
+        if (i == 1) {
+            // Time to mark 'b' for delete.
+            setEnd(b);
+        }
+        ++i;
+        return true;
+    });
+    // Clean up the list to prevent it from trying to destruct 'a' and 'b'.
+    while (local.extract(false));
+});
+
+TOOLS_TEST_CASE("AtomicList.rescan", testParamValues(false)(true), [](Test &, bool rescan)
+{
+    AtomicList<RescanEntry> local;
+    RescanEntry a(1), b(2);
+    // Set the list to [a, b]
+    local.push(&b);
+    local.push(&a);
+    int endCount = 0;
+    auto endHook = [&](RescanEntry const &) {
+        // This is only ever called from inside of the loop that follows, specifically from inside of extract(),
+        // which is inside antoher loop and is how concurrent access is simulated for this test.
+        if (++endCount == 2) {
+            // All items for extraction have been examinted, though we are still within extract(). Synchronous
+            // with exit from this function, extract() will try to release ownership. A call to extract(false)
+            // _should_ be a no-op. A call to extract(true) should prevent the other call to extract() from
+            // releasing. Rather it should re-examine the entire list and extract 'a'.
+            setEnd(a);
+            local.extract(rescan);
+        }
+    };
+    bool dirty = local.forEach([&](RescanEntry &)->bool {
+        // Register our hook function. Doing so here guarantees it is always called when there is an active reader.
+        RescanEntry::isEndHook_ = endHook;
+        // Calling extract should walk the list, calling isEnd on each item (triggering our function).
+        local.extract(false);
+        // Everything we need to do should be done by this point.
+        return false;
+    });
+    // If rescan = false, then the loop should also return false (see notes in the hook). Note that if this fails,
+    // the rescan = true case may also pass, but do so incorrectly. Conversely, if rescan = true, the loop should
+    // return true indicating that there are items in the 'linger slot' pending disposal.
+    TOOLS_ASSERTR(dirty == rescan);
+    // Clean up the list to prevent it from trying to destruct 'a' and 'b'.
+    setEnd(b);
+    while (local.extract(false));
+    // For good measure, reset the hook so that there is no inter-test polution.
+    RescanEntry::isEndHook_ = [](RescanEntry const &) {};
 });
 
 #endif /* TOOLS_UNIT_TEST */
