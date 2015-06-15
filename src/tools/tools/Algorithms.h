@@ -7,7 +7,7 @@
 #ifdef WINDOWS_PLATFORM
 #  include <intrin.h>
 #  include <nmmintrin.h>
-#elif defined(UNIx_PLATFORM)
+#elif defined(UNIX_PLATFORM)
 #  if (defined(__x86_64__) || defined(__i386__))
 // GCC compatible, x86/x86-64
 #    include <x86intrin.h>

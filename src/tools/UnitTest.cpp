@@ -111,20 +111,54 @@ namespace {
         StringId name_;
     };
 
+    struct ServiceFactoryDelegate
+    {
+        ServiceFactoryDelegate(void);
+        ServiceFactoryDelegate(TestEnv::ServiceFactory, void *);
+
+        NoDispose<Unknown> fire(NoDispose<TestEnv>);
+
+        TestEnv::ServiceFactory factory_;
+        void * param_;
+    };
+
     struct TestEnvImpl
         : StandardDisposable<TestEnvImpl, TestEnvItf>
     {
         typedef std::unordered_map<StringId, TestEnvEntry, HashAnyOf<StringId>, std::equal_to<StringId>, AllocatorAffinity<std::pair<StringId, TestEnvEntry>>> ServiceMap;
+        typedef std::unordered_map<StringId, ServiceFactoryDelegate, HashAnyOf<StringId>, std::equal_to<StringId>, AllocatorAffinity<std::pair<StringId, ServiceFactoryDelegate>>> FactoriesMap;
+        typedef std::vector<StringId, AllocatorAffinity<StringId>> CreatingVec;
 
         TestEnvImpl(Environment &, TestImpl &);
 
         // Environment
-        StringId const & name(void);
-        Unknown * get(StringId const &);
+        StringId const & name(void) override;
+        Unknown * get(StringId const &) override;
+
+        // TestEnv
+        Test & getTest(void) override;
+        void mock(StringId const &, NoDispose<Unknown>, bool = false) override;
+        void setFactory(StringId const &, TestEnv::ServiceFactory, void *, StringId const & = StringIdNull()) override;
+        void unmock(StringId const &) override;
+        NoDispose<Unknown> unmockNow(StringId const &) override;
+        NoDispose<Unknown> createReal(StringId const &) override;
+        void stopUnmocked(NoDispose<Service>, unsigned = 0) override;
+        void stopUnmockedNow(NoDispose<Service>) override;
 
         Environment & trueEnvironment_;
         TestImpl & test_;
         ServiceMap services_;
+        FactoriesMap factories_;
+        CreatingVec creating_;
+    };
+
+    struct ServiceCreationStack
+    {
+        ServiceCreationStack(TestEnvImpl::CreatingVec &, StringId const &);
+        ~ServiceCreationStack(void);
+
+        TestEnvImpl::CreatingVec & creating_;
+        StringId name_;
     };
 
     struct TestManagementImpl
@@ -207,6 +241,88 @@ namespace {
         Test * test_;
     };
 
+    struct UnmockStopper
+    {
+        virtual void stop(NoDispose<Service>, unsigned = 0) = 0;
+        virtual void doStops(void) = 0;
+        virtual void stopNow(NoDispose<Service>) = 0;
+    };
+
+    struct UnmockStopperImpl
+        : UnmockStopper
+        , tools::detail::StandardNoBindService<UnmockStopperImpl, boost::mpl::list<UnmockStopper>::type>
+        , Completable<UnmockStopperImpl>
+    {
+        UnmockStopperImpl(Environment &);
+        UnmockStopperImpl(Test &, NoDispose<TestEnv>);
+        ~UnmockStopperImpl(void);
+
+        // UnmockStopper
+        void stop(NoDispose<Service>, unsigned) override;
+        void doStops(void) override;
+        void stopNow(NoDispose<Service>) override;
+
+        // local methods
+        void stopInner(NoDispose<Service>);
+        void stopped(Error *);
+
+        Test & test_;
+        AutoDispose<Request> done_;
+        AutoDispose<> trigger_;
+        AutoDispose<Request> stop_;
+        std::vector<NoDispose<Service>, AllocatorAffinity<NoDispose<Service>>> services_[2];
+    };
+
+    struct NullTestEnv
+        : TestEnv
+    {
+        NullTestEnv(Test &);
+
+        // Environment
+        StringId const & name(void) override;
+        Unknown * get(StringId const &) override;
+
+        // TestEnv
+        Test & getTest(void) override;
+        void mock(tools::StringId const &, tools::NoDispose<tools::Unknown>, bool) override;
+        void setFactory(tools::StringId const &, ServiceFactory, void *, tools::StringId const &override) override;
+        void unmock(tools::StringId const &) override;
+        tools::NoDispose<tools::Unknown> unmockNow(tools::StringId const &) override;
+        tools::NoDispose<tools::Unknown> createReal(tools::StringId const &) override;
+        void stopUnmocked(tools::NoDispose<tools::Service>, unsigned) override;
+        void stopUnmockedNow(tools::NoDispose<tools::Service>) override;
+
+        Test & test_;
+    };
+
+    struct NullTest
+        : Test
+    {
+        NullTest(void);
+
+        // Test
+        void finalize_inner(AutoDispose<> &&) override;
+        void sync(void) override;
+        void resume(void) override;
+        void progressTime(void) override;
+        void progressTime(uint64) override;
+        void fastForwardtime(uint64) override;
+        void adjustPendingTimer(sint64) override;
+        void skewWalltime(sint64) override;
+        void endTimers(void) override;
+        TestEnv & environment(void) override;
+        Environment & trueEnvironment(void) override;
+        AutoDispose<> & cloak(void) override;
+        void run(NoDispose<Request> const &, RequestStatus &) override;
+        void runAndAssertSuccess(AutoDispose<Request> &&) override;
+        void runAndAssertSuccess(NoDispose<Request> const &) override;
+        void runAndAssertError(AutoDispose<Request> &&) override;
+        void runAndAssertError(NoDispose<Request> const &) override;
+        void generatorNext(NoDispose<Generator> const &, unsigned = 5) override;
+
+        NullTestEnv env_;
+    };
+
     static StandardThreadLocalHandle<TestThreadLocal> testLocal_;
 
     Test *
@@ -220,6 +336,15 @@ namespace {
     {
         testLocal_.get()->test_ = test;
     }
+
+    static Test & nullTestNew(void)
+    {
+        static NullTest ret;
+        return ret;
+    }
+
+    auto standardAutoRegister(AutoMock ***, UnmockStopper ***)->
+        RegisterMock<UnmockStopper, UnmockStopperImpl>;
 };  // anonymous namespace
 
 void
@@ -306,6 +431,36 @@ impl::UnitTestMain( int, char ** )
 // Non-member Functions
 ///////////////////////
 
+namespace {
+    static NoDispose<Unknown>
+    unmockFactory(
+        NoDispose<TestEnv> env,
+        void * param)
+    {
+        std::unique_ptr<StringId> id(static_cast<StringId *>(param));
+        return env->createReal(*id);
+    }
+
+    static StringId
+    composeFactoryName(
+        StringId const & service,
+        StringId const & requesting)
+    {
+        if (IsNullOrEmptyStringId(requesting)) {
+            return service;
+        }
+        boost::format fmt("%s^%s");
+        fmt % service % requesting;
+        return fmt.str();
+    }
+}; // anonymous namespace
+
+void
+tools::unittest::impl::registerMockHelper(Test & test, NoDispose<Service> service)
+{
+    test.runAndAssertSuccess(service->start());
+    test.environment().stopUnmocked(service);
+}
 
 ///////////
 // TestImpl
@@ -649,6 +804,29 @@ TestEnvEntry::TestEnvEntry(Unknown * service, StringId const & name)
 {
 }
 
+/////////////////////////
+// ServiceFactoryDelegate
+/////////////////////////
+
+ServiceFactoryDelegate::ServiceFactoryDelegate(void)
+    : factory_(nullptr)
+    , param_(nullptr)
+{}
+
+ServiceFactoryDelegate::ServiceFactoryDelegate(
+    TestEnv::ServiceFactory factory,
+    void * param)
+    : factory_(factory)
+    , param_(param)
+{}
+
+NoDispose<Unknown>
+ServiceFactoryDelegate::fire(
+    NoDispose<TestEnv> env)
+{
+    return factory_(env, param_);
+}
+
 //////////////
 // TestEnvImpl
 //////////////
@@ -669,56 +847,204 @@ TestEnvImpl::name(void)
 Unknown *
 TestEnvImpl::get(StringId const & name)
 {
-    // AutoMockF autoMock;
-    auto serviceIter = services_.find(name);
-    if (serviceIter != services_.end()) {
-        TOOLS_ASSERT(!!serviceIter->second.service_);
-        return serviceIter->second.service_;
-    }
-    // Search for an auto mock
-    //autoMock = envTestAutoMock(this, name);
-    //if (!!autoMock) {
-    //    // Perform the auto mock and check that it registered the requested service
-    //    autoMock(test_, trueEnvironment_, name, this);
-    //    TOOLS_ASSERT(memoryValidate());
-    //    serviceIter = services_.find(name);
-    //    if (serviceIter == services_.end()) {
-    //        // TODO: log this
-    //        fprintf(stderr, "TestEnvImpl::get() - auto mock failed to factory '%s'", name.c_str());
-    //        TOOLS_ASSERT(!"TestEnvImpl::get - auto mock failed to factory requested service");
-    //        return nullptr;
-    //    }
-    //    TOOLS_ASSERT(!!serviceIter->second.service_);
-    //    return serviceIter->second.service_;
-    //}
-    // Check the registry for an auto mock
-    auto registryAutoMock = registryFetch<tools::AutoMock>(name);
-    if (!!registryAutoMock) {
-        registryAutoMock->factory(test_, trueEnvironment_, this);
-        serviceIter = services_.find(name);
-        if (serviceIter == services_.end()) {
-            // TODO: log this
-            fprintf(stderr, "TestEnvImpl::get() - registry auto mock failed to factory '%s'", name.c_str());
-            TOOLS_ASSERT(!"TestEnvImpl::get - registry auto mock failed to factory requested service");
-            return nullptr;
+    StringId requesting(!creating_.empty() ? creating_.back() : StringIdNull());
+    if (!IsNullOrEmptyStringId(requesting)) {
+        StringId requestName = composeFactoryName(name, requesting);
+        auto serviceIter = services_.find(requestName);
+        if (serviceIter != services_.end()) {
+            return serviceIter->second.service_;
         }
-        TOOLS_ASSERT(!!serviceIter->second.service_);
-        return serviceIter->second.service_;
+        auto factory = factories_.find(requestName);
+        if (factory != factories_.end()) {
+            ServiceCreationStack stack(creating_, requestName);
+            if (!test_.isMainThread()) {
+                // TODO: log this
+                fprintf(stderr, "instantiating %s not on the main thread\n", requestName.c_str());
+                TOOLS_ASSERT(!"Instanting service not on main thread");
+            }
+            auto service = factory->second.fire(*this);
+            TOOLS_ASSERT(!!service);
+            services_[name] = TestEnvEntry(&*service, name);
+            return &*service;
+        }
+    }
+    {
+        auto serviceIter = services_.find(name);
+        if (serviceIter != services_.end()) {
+            TOOLS_ASSERT(!!serviceIter->second.service_);
+            return serviceIter->second.service_;
+        }
+    }
+    {
+        if (!test_.isMainThread()) {
+            // TODO: log this
+            fprintf(stderr, "instantiating %s not on the main thread\n", name.c_str());
+            TOOLS_ASSERT(!"Instantiating service not on main thread");
+        }
+        if (std::find(creating_.begin(), creating_.end(), name) != creating_.end()) {
+            // TODO: log this
+            fprintf(stderr, "Service dependency loop while creating %s\n", name.c_str());
+            for (auto && svc : creating_) {
+                // TODO: log this
+                fprintf(stderr, "  creating %s\n", svc.c_str());
+            }
+            TOOLS_ASSERT(!"Service dependency loop");
+        }
+    }
+    ServiceCreationStack stack(creating_, name);
+    {
+        auto factory = factories_.find(name);
+        if (factory != factories_.end()) {
+            if (!test_.isMainThread()) {
+                // TODO: log this
+                fprintf(stderr, "instantiating %s not on the main thread\n", name.c_str());
+                TOOLS_ASSERT(!"Instanting service not on main thread");
+            }
+            auto service = factory->second.fire(*this);
+            TOOLS_ASSERT(!!service);
+            services_[name] = TestEnvEntry(&*service, name);
+            return &*service;
+        }
+    }
+    // Check the registry for an auto mock
+    {
+        auto registryAutoMock = registryFetch<tools::AutoMock>(name);
+        if (!!registryAutoMock) {
+            registryAutoMock->factory(test_, *this);
+            auto serviceIter = services_.find(name);
+            if (serviceIter == services_.end()) {
+                // TODO: log this
+                fprintf(stderr, "TestEnvImpl::get() - registry auto mock failed to factory '%s'\n", name.c_str());
+                TOOLS_ASSERT(!"TestEnvImpl::get - registry auto mock failed to factory requested service");
+                return nullptr;
+            }
+            TOOLS_ASSERT(!!serviceIter->second.service_);
+            return serviceIter->second.service_;
+        }
     }
     // Check if the service is inheritable from the true environment
-    auto factory = registryFetch<tools::impl::FactoryEnvironment>(name);
-    if (!!factory) {
-        // This may be inheritable from the true environment, pass it through.
-        if (factory->describe().inherritable_) {
-            auto * newService = trueEnvironment_.get(name);
-            services_[name] = TestEnvEntry(newService, factory->describe().interfaceName_);
-            return newService;
+    {
+        auto factory = registryFetch<tools::impl::FactoryEnvironment>(name);
+        if (!!factory) {
+            // This may be inheritable from the true environment, pass it through.
+            if (factory->describe().inherritable_) {
+                auto * newService = trueEnvironment_.get(name);
+                services_[name] = TestEnvEntry(newService, factory->describe().interfaceName_);
+                return newService;
+            }
         }
     }
     // TODO: log this
-    fprintf(stderr, "TestEnvImpl::get - service '%s' not found and no appropriate factories available", name.c_str());
+    fprintf(stderr, "TestEnvImpl::get - service '%s' not found and no appropriate factories available\n", name.c_str());
     TOOLS_ASSERT(!"TestEnvImpl::get - could not find service");
     return nullptr;
+}
+
+Test &
+TestEnvImpl::getTest(void)
+{
+    return test_;
+}
+
+void
+TestEnvImpl::mock(
+    StringId const & name,
+    NoDispose<Unknown> itf,
+    bool overwrite)
+{
+    TOOLS_ASSERT(registryFetch<tools::impl::FactoryEnvironment>(name));
+    TOOLS_ASSERT(overwrite || (services_.find(name) == services_.end()));
+    services_[name] = TestEnvEntry(&*itf, name);
+}
+
+void
+TestEnvImpl::setFactory(
+    StringId const & name,
+    TestEnv::ServiceFactory func,
+    void * param,
+    StringId const & requesting)
+{
+    StringId factoryName(composeFactoryName(name, requesting));
+    TOOLS_ASSERT(services_.find(name) == services_.end());
+    TOOLS_ASSERT(factories_.find(factoryName) == factories_.end());
+    factories_[factoryName] = ServiceFactoryDelegate(func, param);
+}
+
+void
+TestEnvImpl::unmock(
+    StringId const & name)
+{
+    setFactory(name, unmockFactory, new StringId(name));
+}
+
+NoDispose<Unknown>
+TestEnvImpl::unmockNow(
+    StringId const & name)
+{
+    auto factory = registryFetch<tools::impl::FactoryEnvironment>(name);
+    if (!factory) {
+        // TODO: log this
+        fprintf(stderr, "Cannot find factory for %s\n", name.c_str());
+        TOOLS_ASSERT(!"Cannot find factory");
+    }
+    auto service = test_.finalize(factory->factory(*this));
+    TOOLS_ASSERT(!!service);
+    mock(name, service);
+    // TODO: log this
+    // start unmock for %s, name.c_str()
+    test_.runAndAssertSuccess(service->start());
+    stopUnmocked(service);
+    return service;
+}
+
+NoDispose<Unknown>
+TestEnvImpl::createReal(
+    StringId const & name)
+{
+    auto factory = registryFetch<tools::impl::FactoryEnvironment>(name);
+    if (!factory) {
+        // TODO: log this
+        fprintf(stderr, "Cannot find factory for '%s'\n", name.c_str());
+        TOOLS_ASSERTR(!"Cannot find factory");
+    }
+    auto service = test_.finalize(factory->factory(*this));
+    test_.runAndAssertSuccess(service->start());
+    stopUnmocked(service);
+    return service;
+}
+
+void
+TestEnvImpl::stopUnmocked(
+    NoDispose<Service> service,
+    unsigned level)
+{
+    Environment::get<UnmockStopper>()->stop(service, level);
+}
+
+void
+TestEnvImpl::stopUnmockedNow(
+    NoDispose<Service> service)
+{
+    Environment::get<UnmockStopper>()->stopNow(service);
+}
+
+///////////////////////
+// ServiceCreationStack
+///////////////////////
+
+ServiceCreationStack::ServiceCreationStack(
+    TestEnvImpl::CreatingVec & creating,
+    StringId const & name)
+    : creating_(creating)
+    , name_(name)
+{
+    creating_.push_back(name);
+}
+
+ServiceCreationStack::~ServiceCreationStack(void)
+{
+    TOOLS_ASSERT(!creating_.empty() && (creating_.back() == name_));
+    creating_.pop_back();
 }
 
 /////////////////////
@@ -872,11 +1198,295 @@ MockTimerReq::reenter(void)
     resumeFinish(err.get());
 }
 
+////////////////////
+// UnmockStopperImpl
+////////////////////
+
+UnmockStopperImpl::UnmockStopperImpl(
+    Environment &)
+    : test_(nullTestNew())
+{
+    TOOLS_ASSERT(!"Should never contruct UnmockStopperImpl via standard environment factory");
+}
+
+UnmockStopperImpl::UnmockStopperImpl(
+    Test & test,
+    NoDispose<TestEnv>)
+    : test_(test)
+{
+}
+
+UnmockStopperImpl::~UnmockStopperImpl(void)
+{
+    TOOLS_ASSERT(services_[0].empty());
+    TOOLS_ASSERT(services_[1].empty());
+}
+
+void
+UnmockStopperImpl::stop(
+    NoDispose<Service> service,
+    unsigned level)
+{
+    TOOLS_ASSERT((level == 0) || (level == 1));
+    services_[level].push_back(service);
+}
+
+void
+UnmockStopperImpl::doStops(void)
+{
+    for (unsigned level = 2; level != 0; --level) {
+        for (auto iter = services_[level - 1].rbegin(); iter != services_[level - 1].rend(); ++iter) {
+            stopInner(*iter);
+        }
+        services_[level - 1].clear();
+    }
+    // Cancel any outstanding timers
+    test_.endTimers();
+}
+
+void
+UnmockStopperImpl::stopNow(
+    NoDispose<Service> service)
+{
+    for (unsigned level = 2; level != 0; --level) {
+        for (auto iter = services_[level - 1].begin(); iter != services_[level - 1].end(); ++iter) {
+            if (*iter == service) {
+                stopInner(*iter);
+                services_[level - 1].erase(iter);
+                return;
+            }
+        }
+    }
+    TOOLS_ASSERT(!"Failed to find service to stop");
+}
+
+void
+UnmockStopperImpl::stopInner(
+    NoDispose<Service> service)
+{
+    stop_ = service->stop();
+    if (!!stop_) {
+        done_ = triggerRequestNew(trigger_);
+        stop_->start(toCompletion<&UnmockStopperImpl::stopped>());
+        // If stop() goes async, then either it has gone async on some other service (which is an error, BTW) or on
+        // a timer. So in that case fire timers now. TODO: consider making the timer service cancel early.
+        if (!!stop_) {
+            test_.progressTime();
+        }
+        // Sleep now in order to support tests which use the real scheduler.
+        runRequestSynchronously(*done_);
+    }
+}
+
+void
+UnmockStopperImpl::stopped(
+    Error *)
+{
+    stop_ = nullptr;
+    trigger_ = nullptr;
+}
+
+//////////////
+// NullTestEnv
+//////////////
+
+NullTestEnv::NullTestEnv(Test & test)
+    : test_(test)
+{
+}
+
+StringId const &
+NullTestEnv::name(void)
+{
+    TOOLS_ASSERT(!"NullTestEnv::name should never be called");
+    return StringIdNull();
+}
+
+Unknown *
+NullTestEnv::get(StringId const &)
+{
+    TOOLS_ASSERT(!"NullTestEnv::get should never be called");
+    return nullptr;
+}
+
+Test &
+NullTestEnv::getTest(void)
+{
+    TOOLS_ASSERT(!"NullTestEnv::getTest should never be called");
+    return test_;
+}
+
+void
+NullTestEnv::mock(StringId const &, NoDispose<Unknown>, bool)
+{
+    TOOLS_ASSERT(!"NullTestEnv::mock should never be called");
+}
+
+void
+NullTestEnv::setFactory(StringId const &, ServiceFactory, void *, StringId const &)
+{
+    TOOLS_ASSERT(!"NullTestEnv::setFactory should never be called");
+}
+
+void
+NullTestEnv::unmock(StringId const &)
+{
+    TOOLS_ASSERT(!"NullTestEnv::unmock should never be called");
+}
+
+NoDispose<Unknown>
+NullTestEnv::unmockNow(StringId const &)
+{
+    TOOLS_ASSERT(!"NullTestEnv::unmockNow should never be called");
+    return nullptr;
+}
+
+NoDispose<Unknown>
+NullTestEnv::createReal(StringId const &)
+{
+    TOOLS_ASSERT(!"NullTestEnv::createReal should never be called");
+    return nullptr;
+}
+
+void
+NullTestEnv::stopUnmocked(NoDispose<Service>, unsigned)
+{
+    TOOLS_ASSERT(!"NullTestEnv::stopUnmocked should never be called");
+}
+
+void
+NullTestEnv::stopUnmockedNow(NoDispose<Service>)
+{
+    TOOLS_ASSERT(!"NullTestEnv::stopUnmockedNow should never be called");
+}
+
+///////////
+// NullTest
+///////////
+
+NullTest::NullTest(void)
+    : env_(*this)
+{}
+
+void
+NullTest::finalize_inner(AutoDispose<> &&)
+{
+    TOOLS_ASSERT(!"NullTest::finalize_inner should never be called");
+}
+
+void
+NullTest::sync(void)
+{
+    TOOLS_ASSERT(!"NullTest::sync should never be called");
+}
+
+void
+NullTest::resume(void)
+{
+    TOOLS_ASSERT(!"NullTest::resume should never be called");
+}
+
+void
+NullTest::progressTime(void)
+{
+    TOOLS_ASSERT(!"NullTest::progressTime should never be called");
+}
+
+void
+NullTest::progressTime(uint64)
+{
+    TOOLS_ASSERT(!"NullTest::progressTime should never be called");
+}
+
+void
+NullTest::fastForwardtime(uint64)
+{
+    TOOLS_ASSERT(!"NullTest::fastForwardtime should never be called");
+}
+
+void
+NullTest::adjustPendingTimer(sint64)
+{
+    TOOLS_ASSERT(!"NullTest::adjustPendingTimer should never be called");
+}
+
+void
+NullTest::skewWalltime(sint64)
+{
+    TOOLS_ASSERT(!"NullTest::skewWalltime should never be called");
+}
+
+void
+NullTest::endTimers(void)
+{
+    TOOLS_ASSERT(!"NullTest::endTimers should never be called");
+}
+
+TestEnv &
+NullTest::environment(void)
+{
+    TOOLS_ASSERT(!"NullTest::environment should never be called");
+    return env_;
+}
+
+Environment &
+NullTest::trueEnvironment(void)
+{
+    TOOLS_ASSERT(!"NullTest::trueEnvironment should never be called");
+    return env_;
+}
+
+AutoDispose<> &
+NullTest::cloak(void)
+{
+    static AutoDispose<> ret;
+    TOOLS_ASSERT(!"NullTest::cloak should never be called");
+    return ret;
+}
+
+void
+NullTest::run(NoDispose<Request> const &, RequestStatus &)
+{
+    TOOLS_ASSERT(!"NullTest::run should never be called");
+}
+
+void
+NullTest::runAndAssertSuccess(AutoDispose<Request> &&)
+{
+    TOOLS_ASSERT(!"NullTest::runAndAssertSuccess should never be called");
+}
+
+void
+NullTest::runAndAssertSuccess(NoDispose<Request> const &)
+{
+    TOOLS_ASSERT(!"NullTest::runAndAssertSuccess should never be called");
+}
+
+void
+NullTest::runAndAssertError(AutoDispose<Request> &&)
+{
+    TOOLS_ASSERT(!"NullTest::runAndAssertError should never be called");
+}
+
+void
+NullTest::runAndAssertError(NoDispose<Request> const &)
+{
+    TOOLS_ASSERT(!"NullTest::runAndAssertError should never be called");
+}
+
+void
+NullTest::generatorNext(NoDispose<Generator> const &, unsigned)
+{
+    TOOLS_ASSERT(!"NullTest::generatorNext should never be called");
+}
+
 ///////////////////////
 // Static registrations
 ///////////////////////
 
 static RegisterEnvironment< tools::unittest::impl::Management, TestManagementImpl > regManagement;
+static RegisterEnvironment< UnmockStopper, UnmockStopperImpl > regStopper;
+static RegisterAuto<AutoMock, UnmockStopper> regUnmock;
 
 // Do we have unit tests for the unit test framework?  Of course we do!
 #if TOOLS_UNIT_TEST

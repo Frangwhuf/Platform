@@ -175,7 +175,69 @@ namespace { \
 // Next generation of unit test registration.
 
 namespace tools {
-	struct TestEnv : Environment {};
+    struct Test;
+	struct TestEnv : Environment
+    {
+        typedef tools::NoDispose<tools::Unknown>(*ServiceFactory)(tools::NoDispose<TestEnv>, void *);
+
+        template<typename ServiceT>
+        struct SetFactoryTrampoline
+            : tools::StandardDisposable<SetFactoryTrampoline<ServiceT>>
+        {
+            SetFactoryTrampoline(std::function<tools::NoDispose<ServiceT>(tools::NoDispose<TestEnv>)> & func)
+                : func_(func)
+            {}
+
+            static tools::NoDispose<tools::Unknown> runFactory(tools::NoDispose<TestEnv> env, void * param)
+            {
+                auto this_ = static_cast<SetFactoryTrampoline<ServiceT> *>(param);
+                return this_->func_(env);
+            }
+
+            std::function<tools::NoDispose<ServiceT>(tools::NoDispose<TestEnv>)> func_;
+        };
+
+        virtual Test & getTest(void) = 0;
+        virtual void mock(tools::StringId const &, tools::NoDispose<tools::Unknown>, bool = false) = 0;
+        template<typename ServiceT, typename AnyT>
+        void 
+        mock(tools::NoDispose<AnyT> mocked, bool override = false, ServiceT *** = 0, AnyT *** = 0)
+        {
+            mock(tools::nameOf<ServiceT>(), mocked, override);
+        }
+        virtual void setFactory(tools::StringId const &, ServiceFactory, void *, tools::StringId const & = tools::StringIdNull()) = 0;
+        template<typename ServiceT>
+        void
+        setFactory(std::function<tools::NoDispose<typename tools::ServiceInterfaceOf<ServiceT>::Type> (tools::NoDispose<TestEnv>)> const & sfunc, ServiceT *** = 0)
+        {
+            typedef typename tools::ServiceInterfaceOf<ServiceT>::Type InterfaceT;
+            auto trampoline = this->getTest()->finalize(new SetFactoryTrampoline<InterfaceT>(sf));
+            setFactory(tools::nameOf<ServiceT>(), &SetFactoryTrampoline<ServiceT>::runFactory, &*trampoline);
+        }
+        virtual void unmock(tools::StringId const &) = 0;
+        template<typename ServiceT>
+        void 
+        unmock(ServiceT *** = 0)
+        {
+            unmock(tools::nameOf<ServiceT>());
+        }
+        virtual tools::NoDispose<tools::Unknown> unmockNow(tools::StringId const &) = 0;
+        template<typename ServiceT>
+        tools::NoDispose<typename tools::ServiceInterfaceOf<ServiceT>::Type> 
+        unmockNow(ServiceT *** = 0)
+        {
+            return static_cast<typename tools::ServiceInterfaceOf<ServiceT>::Type &>(*unmockNow(tools::nameOf<ServiceT>()));
+        }
+        virtual tools::NoDispose<tools::Unknown> createReal(tools::StringId const &) = 0;
+        template<typename ServiceT>
+        tools::NoDispose<typename tools::ServiceInterfaceOf<ServiceT>::Type>
+        createReal(ServiceT *** = 0)
+        {
+            return static_cast<typename tools::ServiceInterfaceOf<ServiceT>::Type &>(createReal(tools::nameOf<ServiceT>()));
+        }
+        virtual void stopUnmocked(tools::NoDispose<tools::Service>, unsigned = 0) = 0;
+        virtual void stopUnmockedNow(tools::NoDispose<tools::Service>) = 0;
+    };
 	struct Test
 	{
         struct RequestStatus
@@ -226,6 +288,14 @@ namespace tools {
             this->finalize_inner(std::move(disp));
             return ret;
         }
+        template<typename AnyT>
+        TOOLS_FORCE_INLINE NoDispose<AnyT>
+            finalize(AnyT * && disp)
+        {
+            NoDispose<AnyT> ret(*disp);
+            this->finalize_inner(tools::AutoDispose<>(disp));
+            return ret;
+        }
 
         virtual void run(NoDispose<Request> const &, RequestStatus &) = 0;
         TOOLS_FORCE_INLINE void run(AutoDispose<Request> && req, RequestStatus & status) {
@@ -241,7 +311,7 @@ namespace tools {
 
     struct AutoMock
     {
-        virtual void factory(Test & test, Environment & real_env, Environment * sub_env) = 0;
+        virtual void factory(Test & test, NoDispose<TestEnv> subEnv) = 0;
     };
 
 	namespace unittest {
@@ -259,8 +329,44 @@ namespace tools {
                 virtual unsigned list(StringId const &) = 0;
                 virtual void executeSingle(StringId const &, TestCase &) = 0;
             };
+
+            template<typename ServiceT>
+            struct RegisterReal
+                : tools::AutoMock
+            {
+                // AutoMock
+                void factory(tools::Test &, tools::NoDispose<tools::TestEnv> subEnv) override
+                {
+                    subEnv->unmockNow<ServiceT>();
+                }
+            };
+
+            TOOLS_API void registerMockHelper(Test &, NoDispose<Service>);
 		}; // impl namespace
 	}; // unittest namespace
+    template<typename ServiceT, typename ImplementationT>
+    struct RegisterMock
+        : AutoMock
+    {
+        // AutoMock
+        void factory(Test & test, NoDispose<TestEnv> subEnv) override
+        {
+            auto impl = test.finalize(new ImplementationT(test, subEnv));
+            subEnv->mock<ServiceT>(impl);
+            tools::unittest::impl::registerMockHelper(test, impl);
+        }
+    };
+
+    template<typename ServiceT>
+    auto standardAutoRegister(AutoMock ***, ServiceT ***)->
+        tools::unittest::impl::RegisterReal<ServiceT>;
+
+    template<typename ServiceT>
+    TOOLS_FORCE_INLINE void registryAutoDepends(AutoMock ***, ServiceT ***)
+    {
+        // no dependencies
+    }
+
 	struct RegisterTestFunctor
 	{
 		// The actual inner implementation for a test case.
@@ -366,6 +472,7 @@ namespace tools {
 			void run(tools::Test &) override
 			{
 				// TODO: log that parent.name_ is disabled for reason_
+                fprintf(stderr, "Test '%s' disabled because: %s\n", parent_.name_.c_str(), reason_);
 			}
 
 			RegisterTestFunctor & parent_;

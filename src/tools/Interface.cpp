@@ -485,8 +485,8 @@ impl::resourceTraceDump(
             if( j->target_ != trace ) {
                 continue;
             }
-            StringId name = detail::symbolNameFromAddress( j->symbol() );
             if( j->currAllocated_ > 0 ) {
+                StringId name = detail::symbolNameFromAddress( j->symbol() );
                 // TODO: log this
                 fprintf( stderr, "leak\t%d\t%d\t%s", j->currAllocated_, j->size(), name.c_str() );
             }

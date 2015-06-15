@@ -925,7 +925,7 @@ namespace tools {
         }
 
         void name( void ) {
-            if( impl::memTracking() ) {
+            if( impl::memoryTrack() ) {
                 name_ = tools::nameOf< AllocCyclicRoot< ElementT >>();
             }
         }
@@ -1049,7 +1049,7 @@ namespace tools {
         }
 
         void name( void ) {
-            if( impl::memTracking() ) {
+            if( impl::memoryTrack() ) {
                 name_ = tools::nameOf< AllocatorThisT >();
             }
         }
@@ -1128,7 +1128,7 @@ namespace tools {
                 }
             }
             // Not a node-sized deallocation. Use our base AllocatorAffinity<>.
-            BaseT::deallocate( ptr, count );
+            BaseT::deallocate( site, count );
         }
 
         // Regular path

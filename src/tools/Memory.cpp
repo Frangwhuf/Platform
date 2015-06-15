@@ -5827,3 +5827,224 @@ static tools::RegisterFactoryRegistryFunctor< tools::detail::CyclicPoolDesc > re
         *ref = newItem;
         return std::move(newItem);
     });
+
+////////
+// Tests
+////////
+
+#include <tools/UnitTest.h>
+#ifdef TOOLS_UNIT_TEST
+
+#include <tools/AlgorithmsTools.h>
+
+namespace {
+    static void
+    testAffinity(Affinity & affinity, bool aligned)
+    {
+        // Test a strict alloc-free pattern. Slabs are always perfectly recycled.
+        AutoDispose<RandomState> prng(randomStateNew(0));
+        for (unsigned count = 0; count < 5000; ++count) {
+            unsigned bytes = prng->rndU32() % (512 * 1024) + 8;
+            // The Inherent heap allocator requres the size to be word-aligned.
+            if (aligned && ((bytes % 64) != 0)) {
+                bytes = static_cast<unsigned>(bytes & ~63U) +  64U;
+            }
+            void * ptr1 = affinity.alloc(bytes);
+            affinity.free(ptr1);
+            void * ptr2 = affinity.map(bytes);
+            affinity.unmap(ptr2);
+        }
+        // Test alloc-free without perfect slab recycling on each iteration.
+        for (unsigned count = 0; count < 100; ++count) {
+            std::array<void *, 50> ptrs;
+            for (unsigned inner = 0; inner < 50; ++inner) {
+                unsigned bytes = prng->rndU32() % (512 * 1024) + 8;
+                if (aligned && ((bytes % 64) != 0)) {
+                    bytes = static_cast<unsigned>(bytes & ~63U) + 64U;
+                }
+                ptrs[inner] = affinity.alloc(bytes);
+            }
+            for (auto && ptr : ptrs) {
+                affinity.free(ptr);
+            }
+            for (unsigned inner = 0; inner < 50; ++inner) {
+                unsigned bytes = prng->rndU32() % (512 * 1024) + 8;
+                if (aligned && ((bytes % 64) != 0)) {
+                    bytes = static_cast<unsigned>(bytes & ~63U) + 64U;
+                }
+                ptrs[inner] = affinity.map(bytes);
+            }
+            for (auto && ptr : ptrs) {
+                affinity.unmap(ptr);
+            }
+        }
+    }
+
+    static TOOLS_FORCE_INLINE uintptr_t
+    toSlab(void * site)
+    {
+        // Assume that slabs are 2MB
+        uintptr_t addr = reinterpret_cast<uintptr_t>(site);
+        return tools::roundDownPow2(addr, 2 * 1024 * 1024);
+    }
+}; // anonymous namespace
+
+TOOLS_TEST_CASE("affinity.temporal.basic", "Temporal isn't completely happy", [](Test &)
+{
+    Affinity & affinity = tools::impl::affinityInstance<Temporal>();
+    testAffinity(affinity, false);
+});
+
+TOOLS_TEST_CASE("affinity.inherent.basic", [](Test &)
+{
+    Affinity & affinity = tools::impl::affinityInstance<Inherent>();
+    testAffinity(affinity, true);
+});
+
+TOOLS_TEST_CASE("affinity.inherent.pool", [](Test &)
+{
+    AutoDispose<RandomState> prng(randomStateNew(0));
+    enum : uint32 {
+        MaxBytes = (256 * 1024),
+        MinBytes = 8,
+    };
+    Affinity & affinity = tools::impl::affinityInstance<Inherent>();
+    // Test pool allocations without 'phase'
+    for (auto i = 0; i < 1000; ++i) {
+        unsigned bytes = (prng->rndU32() % (MaxBytes - MinBytes)) + MinBytes;
+        Pool & pool = affinity.pool(bytes);
+        void * ptr = pool.map();
+        pool.unmap(ptr);
+    }
+    // Test pool allocations with 'phase'
+    for (auto i = 0; i < 1000; ++i) {
+        unsigned bytes = (prng->rndU32() % (MaxBytes - MinBytes)) + MinBytes;
+        unsigned phase = prng->rndU32() % bytes;
+        Pool & pool = affinity.pool(bytes, phase);
+        void * ptr = pool.map();
+        pool.unmap(ptr);
+    }
+});
+
+TOOLS_TEST_CASE("affinity.cyclic", "AllocatorCyclic is not fully happy", [](Test &)
+{
+    std::map<unsigned, unsigned, std::less<unsigned>, AllocatorCyclic<std::pair<unsigned const, unsigned>>> dummy;
+    // Use and reuse
+    for (auto i = 0; i < 10000; ++i) {
+        dummy[55] = 56;
+        dummy.erase(55);
+    }
+    // Fill a large amount
+    for (unsigned i = 0; i < 10240; ++i) {
+        dummy[i] = i * 100;
+    }
+    // Erase what we just filled
+    dummy.clear();
+    // Refill
+    for (unsigned i = 0; i < 10240; ++i) {
+        dummy[i] = i * 100;
+    }
+});
+
+TOOLS_TEST_CASE("affinity.temporal.customSlab", "Temporal is not completely happy", [](Test &)
+{
+    Affinity * customTemporal;
+    AutoDispose<> disp(affinityTemporalThreadLocalNew(&customTemporal, tools::impl::affinityInstance<Inherent>(), TOOLS_RESOURCE_SAMPLE_NAMED(0, "custom temporal unit test") /*, true, 2*1024*1024, default_align*/));
+    Pool & pool = customTemporal->pool(128, TOOLS_RESOURCE_SAMPLE_CALLER(0));
+    Heap & heap = *customTemporal;
+    void * ptr1 = pool.map();
+    void * ptr2 = heap.map(64);
+    TOOLS_ASSERTR(toSlab(ptr1) == toSlab(ptr2));
+    TOOLS_ASSERTR(reinterpret_cast<uintptr_t>(ptr2) > reinterpret_cast<uintptr_t>(ptr1)); // Temporal always moves forward
+    void * ptr3 = pool.map();
+    TOOLS_ASSERTR(toSlab(ptr3) == toSlab(ptr2));
+    TOOLS_ASSERTR(reinterpret_cast<uintptr_t>(ptr3) > reinterpret_cast<uintptr_t>(ptr2));
+    void * ptr4 = pool.map();
+    TOOLS_ASSERTR(toSlab(ptr4) == toSlab(ptr3));
+    TOOLS_ASSERTR(reinterpret_cast<uintptr_t>(ptr4) > reinterpret_cast<uintptr_t>(ptr3));
+    void * ptr5 = heap.map(256);
+    TOOLS_ASSERTR(toSlab(ptr5) == toSlab(ptr4));
+    TOOLS_ASSERTR(reinterpret_cast<uintptr_t>(ptr5) > reinterpret_cast<uintptr_t>(ptr4));
+    heap.unmap(ptr5);
+    pool.unmap(ptr4);
+    pool.unmap(ptr3);
+    heap.unmap(ptr2);
+    pool.unmap(ptr1);
+    // While we have now deleted our allocations, temporal continues to fill the slab. So we can continue to assert
+    // the direction of allocation.
+    void * ptr6 = pool.map();
+    TOOLS_ASSERTR(toSlab(ptr6) == toSlab(ptr5));
+    TOOLS_ASSERTR(reinterpret_cast<uintptr_t>(ptr6) > reinterpret_cast<uintptr_t>(ptr5));
+    void * ptr7 = heap.map(128);
+    TOOLS_ASSERTR(toSlab(ptr7) == toSlab(ptr6));
+    TOOLS_ASSERTR(reinterpret_cast<uintptr_t>(ptr7) > reinterpret_cast<uintptr_t>(ptr6));
+    void * ptr8 = pool.map();
+    TOOLS_ASSERTR(toSlab(ptr8) == toSlab(ptr7));
+    TOOLS_ASSERTR(reinterpret_cast<uintptr_t>(ptr8) > reinterpret_cast<uintptr_t>(ptr7));
+    void * ptr9 = pool.map();
+    TOOLS_ASSERTR(toSlab(ptr9) == toSlab(ptr8));
+    TOOLS_ASSERTR(reinterpret_cast<uintptr_t>(ptr9) > reinterpret_cast<uintptr_t>(ptr8));
+    void * ptr10 = heap.map(1024);
+    TOOLS_ASSERTR(toSlab(ptr10) == toSlab(ptr9));
+    TOOLS_ASSERTR(reinterpret_cast<uintptr_t>(ptr10) > reinterpret_cast<uintptr_t>(ptr9));
+    heap.unmap(ptr10);
+    pool.unmap(ptr9);
+    pool.unmap(ptr8);
+    heap.unmap(ptr7);
+    pool.unmap(ptr6);
+});
+
+TOOLS_TEST_CASE("affinity.temporal.customSlab", "Temporal is not completely happy", [](Test &)
+{
+    enum : unsigned {
+        alignment = 256,  // temporal defaul is 64
+    };
+    Affinity * customTemporal;
+    AutoDispose<> disp(affinityTemporalThreadLocalNew(&customTemporal, tools::impl::affinityInstance<Inherent>(), TOOLS_RESOURCE_SAMPLE_NAMED(0, "custom temporal unit test") /*, true, 2*1024*1024, alignment*/));
+    Pool & pool = customTemporal->pool(16, TOOLS_RESOURCE_SAMPLE_CALLER(0));
+    Heap & heap = *customTemporal;
+    void * ptr1 = pool.map();
+    void * ptr2 = heap.map(32);
+    TOOLS_ASSERTR((reinterpret_cast<uintptr_t>(ptr2) % alignment) == 0);
+    TOOLS_ASSERTR(toSlab(ptr2) == toSlab(ptr1));
+    TOOLS_ASSERTR(reinterpret_cast<uintptr_t>(ptr2) > reinterpret_cast<uintptr_t>(ptr1));
+    void * ptr3 = pool.map();
+    TOOLS_ASSERTR(toSlab(ptr3) == toSlab(ptr2));
+    TOOLS_ASSERTR(reinterpret_cast<uintptr_t>(ptr3) > reinterpret_cast<uintptr_t>(ptr2));
+    void * ptr4 = pool.map();
+    TOOLS_ASSERTR(toSlab(ptr4) == toSlab(ptr3));
+    TOOLS_ASSERTR(reinterpret_cast<uintptr_t>(ptr4) > reinterpret_cast<uintptr_t>(ptr3));
+    void * ptr5 = heap.map(64);
+    TOOLS_ASSERTR((reinterpret_cast<uintptr_t>(ptr5) % alignment) == 0);
+    TOOLS_ASSERTR(toSlab(ptr5) == toSlab(ptr4));
+    TOOLS_ASSERTR(reinterpret_cast<uintptr_t>(ptr5) > reinterpret_cast<uintptr_t>(ptr4));
+    heap.unmap(ptr5);
+    pool.unmap(ptr4);
+    pool.unmap(ptr3);
+    heap.unmap(ptr2);
+    pool.unmap(ptr1);
+    void * ptr6 = pool.map();
+    TOOLS_ASSERTR(toSlab(ptr6) == toSlab(ptr5));
+    TOOLS_ASSERTR(reinterpret_cast<uintptr_t>(ptr6) > reinterpret_cast<uintptr_t>(ptr5));
+    void * ptr7 = heap.map(32);
+    TOOLS_ASSERTR((reinterpret_cast<uintptr_t>(ptr7) % alignment) == 0);
+    TOOLS_ASSERTR(toSlab(ptr7) == toSlab(ptr6));
+    TOOLS_ASSERTR(reinterpret_cast<uintptr_t>(ptr7) > reinterpret_cast<uintptr_t>(ptr6));
+    void * ptr8 = pool.map();
+    TOOLS_ASSERTR(toSlab(ptr8) == toSlab(ptr7));
+    TOOLS_ASSERTR(reinterpret_cast<uintptr_t>(ptr8) > reinterpret_cast<uintptr_t>(ptr7));
+    void * ptr9 = pool.map();
+    TOOLS_ASSERTR(toSlab(ptr9) == toSlab(ptr8));
+    TOOLS_ASSERTR(reinterpret_cast<uintptr_t>(ptr9) > reinterpret_cast<uintptr_t>(ptr8));
+    void * ptr10 = heap.map(8);
+    TOOLS_ASSERTR((reinterpret_cast<uintptr_t>(ptr10) % alignment) == 0);
+    TOOLS_ASSERTR(toSlab(ptr10) == toSlab(ptr9));
+    TOOLS_ASSERTR(reinterpret_cast<uintptr_t>(ptr10) > reinterpret_cast<uintptr_t>(ptr9));
+    heap.unmap(ptr10);
+    pool.unmap(ptr9);
+    pool.unmap(ptr8);
+    heap.unmap(ptr7);
+    pool.unmap(ptr6);
+});
+
+#endif // TOOLS_UNIT_TEST

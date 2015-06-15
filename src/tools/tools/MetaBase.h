@@ -182,7 +182,7 @@ namespace tools {
         template< typename SequenceT, size_t i >
         struct SequenceNextOrEnd
         {
-            typedef typename std::conditional< i == tools::SequenceSize< SequenceT >::Value, SequenceIterEnd, SequenceIter< SequenceT, i >>::Type Type;
+            typedef typename std::conditional< i == tools::SequenceSize< SequenceT >::value, SequenceIterEnd, SequenceIter< SequenceT, i >>::type Type;
         };
 
         template< typename SequenceT >
@@ -936,13 +936,13 @@ namespace tools {
         typedef typename tools::SequenceEnd< SequenceOrTypeT >::Type IterEndT;
 
         template< typename VisitorT >
-        TOOLS_FORCE_INLINE static void next( VisitorT * __restrict v, IterEndT *** ) {
+        TOOLS_FORCE_INLINE static void next( VisitorT * __restrict, IterEndT *** ) {
             // terminator
         }
 
         template< typename VisitorT, typename IteratorT >
         TOOLS_FORCE_INLINE static void next( VisitorT * __restrict v, IteratorT *** ) {
-            ( *v )( IteratorT::Value, static_cast< typename IteratorT::Type *** >( 0 ));
+            ( *v )( IteratorT::value, static_cast< typename IteratorT::Type *** >( 0 ));
             next( v, static_cast< IteratorT::Next *** >( 0 ));
         }
 

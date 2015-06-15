@@ -167,9 +167,9 @@ namespace tools {
     TOOLS_NO_INLINE inline void registryAutoInsert( ServiceT *** = 0, TypeT *** = 0 ) {
         static tools::AutoDispose<> register_;
         if( !register_ ) {
-            registryAutoDepends< ServiceT, TypeT >();
+            registryAutoDepends(static_cast<ServiceT ***>(nullptr), static_cast<TypeT ***>(nullptr));
             if( !register_ ) {
-                register_.reset( tools::registryFetch< AutoRegister, ServiceT >()->insert( tools::nameOf< TypeT >(), tools::detail::AutoFactoryRegister< ServiceT, TypeT >::storage() ));
+                register_ = tools::registryFetch< AutoRegister, ServiceT >()->insert( tools::nameOf< TypeT >(), tools::detail::AutoFactoryRegister< ServiceT, TypeT >::storage() );
             }
         }
     }
@@ -207,7 +207,7 @@ namespace tools {
     template< typename ServiceT, typename TypeT >
     struct ResolveAutoRegister
     {
-        typedef decltype( standardAutoRegister< ServiceT, TypeT >() ) DeclTypeT;
+        typedef decltype(standardAutoRegister(static_cast<ServiceT ***>(nullptr), static_cast<TypeT ***>(nullptr))) DeclTypeT;
         typedef DeclTypeT Type;
     };
 
