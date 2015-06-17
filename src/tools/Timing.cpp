@@ -292,4 +292,26 @@ TOOLS_TEST_CASE("Timing.mark.wait", "Timing leaves things allocated", [](Test & 
     }
 });
 
+TOOLS_TEST_CASE("time.units", [](Test &)
+{
+    auto nsecs = 23_ns;
+    static_assert(std::is_same<decltype(nsecs), uint64>::value, "integer time literals should resolve to uint64 nanoseconds");
+    TOOLS_ASSERTR(nsecs == 23);
+    nsecs = 123_us;
+    TOOLS_ASSERTR(nsecs == 123000);
+    nsecs = 987_ms;
+    TOOLS_ASSERTR(nsecs == 987000000);
+    nsecs = 645_s;
+    TOOLS_ASSERTR(nsecs == 645000000000);
+    auto fnsecs = 1.23_ns;
+    static_assert(std::is_same<decltype(fnsecs), uint64>::value, "float time literals should resolve to uint64 nanoseconds");
+    TOOLS_ASSERTR(fnsecs == 1);
+    fnsecs = 2.34_us;
+    TOOLS_ASSERTR(fnsecs == 2340);
+    fnsecs = 3.45_ms;
+    TOOLS_ASSERTR(fnsecs == 3450000);
+    fnsecs = 4.56_s;
+    TOOLS_ASSERTR(fnsecs == 4560000000);
+});
+
 #endif // TOOLS_UNIT_TEST
